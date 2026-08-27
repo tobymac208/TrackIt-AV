@@ -47,7 +47,7 @@ export default function Offices() {
       <div className="page-header">
         <div>
           <h2>Offices</h2>
-          <p>Manage office locations</p>
+          <p>{offices.length} office{offices.length !== 1 ? 's' : ''} listed</p>
         </div>
         <button className="btn btn-primary" onClick={() => setModal({ mode: 'create' })}>
           Add Office
@@ -65,6 +65,7 @@ export default function Offices() {
             <table>
               <thead>
                 <tr>
+                  <th className="col-num">#</th>
                   <th>Name</th>
                   <th>Rooms</th>
                   <th>Created</th>
@@ -72,8 +73,9 @@ export default function Offices() {
                 </tr>
               </thead>
               <tbody>
-                {offices.map((office) => (
+                {offices.map((office, index) => (
                   <tr key={office.id}>
+                    <td className="col-num">{index + 1}</td>
                     <td>{office.name}</td>
                     <td>{office.room_count}</td>
                     <td>{new Date(office.created_at).toLocaleDateString()}</td>

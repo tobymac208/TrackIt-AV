@@ -53,7 +53,7 @@ export default function Rooms() {
       <div className="page-header">
         <div>
           <h2>Conference Rooms</h2>
-          <p>Manage rooms and their assigned hardware</p>
+          <p>{rooms.length} room{rooms.length !== 1 ? 's' : ''} listed</p>
         </div>
         <button
           className="btn btn-primary"
@@ -91,6 +91,7 @@ export default function Rooms() {
             <table>
               <thead>
                 <tr>
+                  <th className="col-num">#</th>
                   <th>Room Name</th>
                   <th>Office</th>
                   <th>Hardware</th>
@@ -98,8 +99,9 @@ export default function Rooms() {
                 </tr>
               </thead>
               <tbody>
-                {rooms.map((room) => (
+                {rooms.map((room, index) => (
                   <tr key={room.id} className="clickable" onClick={() => navigate(`/rooms/${room.id}`)}>
+                    <td className="col-num">{index + 1}</td>
                     <td>{room.name}</td>
                     <td>{room.office_name}</td>
                     <td>{room.hardware_count}</td>

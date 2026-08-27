@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import Modal from '../components/Modal';
 import HardwareForm from '../components/HardwareForm';
+import HardwareImport from '../components/HardwareImport';
 import ImportanceBadge, { formatDate, formatCost, isEosSoon, isEosPast } from '../components/ImportanceBadge';
 
 const IMPORTANCE_LEVELS = ['', 'low', 'medium', 'high', 'critical'];
@@ -12,10 +13,13 @@ export default function Hardware() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [modal, setModal] = useState(null);
+  const [showImport, setShowImport] = useState(false);
   const [search, setSearch] = useState('');
   const [importanceFilter, setImportanceFilter] = useState('');
   const [eosFilter, setEosFilter] = useState('');
   const [revealedPasswords, setRevealedPasswords] = useState({});
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [deleting, setDeleting] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -46,6 +50,48 @@ export default function Hardware() {
       item.room_name?.toLowerCase().includes(q)
     );
   });
+
+  const allFilteredSelected =
+    filtered.length > 0 && filtered.every((item) => selectedIds.has(item.id));
+  const selectedCount = selectedIds.size;
+
+  const toggleSelectAll = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allFilteredSelected) {
+        filtered.forEach((item) => next.delete(item.id));
+      } else {
+        filtered.forEach((item) => next.add(item.id));
+      }
+      return next;
+    });
+  };
+
+  const toggleSelect = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedCount === 0) return;
+    if (!window.confirm(`Delete ${selectedCount} selected device${selectedCount !== 1 ? 's' : ''}?`)) return;
+
+    setDeleting(true);
+    setError('');
+    try {
+      await api.deleteHardwareBulk([...selectedIds]);
+      setSelectedIds(new Set());
+      load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const handleCreate = async (data) => {
     await api.createHardware(data);
@@ -89,11 +135,19 @@ export default function Hardware() {
       <div className="page-header">
         <div>
           <h2>Hardware Inventory</h2>
-          <p>Manage all AV hardware across your organization</p>
+          <p>
+            {filtered.length} device{filtered.length !== 1 ? 's' : ''} listed
+            {filtered.length !== hardware.length && ` (of ${hardware.length} total)`}
+          </p>
         </div>
-        <button className="btn btn-primary" onClick={() => setModal({ mode: 'create' })}>
-          Add Hardware
-        </button>
+        <div className="actions">
+          <button className="btn btn-secondary" onClick={() => setShowImport(true)}>
+            Import CSV
+          </button>
+          <button className="btn btn-primary" onClick={() => setModal({ mode: 'create' })}>
+            Add Hardware
+          </button>
+        </div>
       </div>
 
       <div className="filters">
@@ -117,6 +171,17 @@ export default function Hardware() {
           <option value="">All</option>
           <option value="soon">Within 90 days</option>
         </select>
+        {selectedCount > 0 && (
+          <>
+            <span className="selection-count">{selectedCount} selected</span>
+            <button className="btn btn-danger btn-sm" onClick={handleBulkDelete} disabled={deleting}>
+              {deleting ? 'Deleting...' : 'Delete Selected'}
+            </button>
+            <button className="btn btn-secondary btn-sm" onClick={() => setSelectedIds(new Set())} disabled={deleting}>
+              Clear Selection
+            </button>
+          </>
+        )}
       </div>
 
       {error && <div className="error-banner">{error}</div>}
@@ -130,6 +195,16 @@ export default function Hardware() {
             <table>
               <thead>
                 <tr>
+                  <th className="col-check">
+                    <input
+                      type="checkbox"
+                      checked={allFilteredSelected}
+                      onChange={toggleSelectAll}
+                      aria-label="Select all visible devices"
+                      title="Select all visible"
+                    />
+                  </th>
+                  <th className="col-num">#</th>
                   <th>Device</th>
                   <th>Location</th>
                   <th>Importance</th>
@@ -142,8 +217,17 @@ export default function Hardware() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((item) => (
-                  <tr key={item.id} className={rowClass(item)}>
+                {filtered.map((item, index) => (
+                  <tr key={item.id} className={`${rowClass(item)}${selectedIds.has(item.id) ? ' row-selected' : ''}`}>
+                    <td className="col-check">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(item.id)}
+                        onChange={() => toggleSelect(item.id)}
+                        aria-label={`Select ${item.manufacturer} ${item.model}`}
+                      />
+                    </td>
+                    <td className="col-num">{index + 1}</td>
                     <td>
                       <strong>
                         {item.manufacturer} {item.model}
@@ -190,6 +274,12 @@ export default function Hardware() {
             </table>
           </div>
         </div>
+      )}
+
+      {showImport && (
+        <Modal title="Import Hardware from CSV" onClose={() => setShowImport(false)}>
+          <HardwareImport onClose={() => setShowImport(false)} onComplete={load} />
+        </Modal>
       )}
 
       {modal && (

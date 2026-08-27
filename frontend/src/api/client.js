@@ -46,4 +46,6 @@ export const api = {
       body: JSON.stringify({ conferenceRoomId }),
     }),
   deleteHardware: (id) => request(`/hardware/${id}`, { method: 'DELETE' }),
+  deleteHardwareBulk: (ids) => Promise.all(ids.map((id) => request(`/hardware/${id}`, { method: 'DELETE' }))),
+  importHardware: (csv) => request('/hardware/import', { method: 'POST', body: JSON.stringify({ csv }) }),
 };
