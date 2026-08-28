@@ -110,6 +110,7 @@ export default function RoomDetail() {
                   <th>IP Address</th>
                   <th>Serial #</th>
                   <th>EOS Date</th>
+                  <th>Warranty</th>
                   <th>Est. Cost</th>
                   <th>Actions</th>
                 </tr>
@@ -131,6 +132,7 @@ export default function RoomDetail() {
                     <td>{item.ip_address || '—'}</td>
                     <td>{item.serial_number || '—'}</td>
                     <td>{formatDate(item.end_of_support_date)}</td>
+                    <td>{formatDate(item.end_of_warranty_date)}</td>
                     <td>{formatCost(item.estimated_replacement_cost)}</td>
                     <td>
                       <button className="btn btn-secondary btn-sm" onClick={() => handleUnassign(item)}>

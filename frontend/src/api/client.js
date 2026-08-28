@@ -47,5 +47,7 @@ export const api = {
     }),
   deleteHardware: (id) => request(`/hardware/${id}`, { method: 'DELETE' }),
   deleteHardwareBulk: (ids) => Promise.all(ids.map((id) => request(`/hardware/${id}`, { method: 'DELETE' }))),
+  bulkUpdateHardware: (ids, updates) =>
+    request('/hardware/bulk-update', { method: 'PATCH', body: JSON.stringify({ ids, updates }) }),
   importHardware: (csv) => request('/hardware/import', { method: 'POST', body: JSON.stringify({ csv }) }),
 };

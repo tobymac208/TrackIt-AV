@@ -3,7 +3,13 @@ import { api } from '../api/client';
 import Modal from '../components/Modal';
 import HardwareForm from '../components/HardwareForm';
 import HardwareImport from '../components/HardwareImport';
-import ImportanceBadge, { formatDate, formatCost, isEosSoon, isEosPast } from '../components/ImportanceBadge';
+import HardwareBulkEdit from '../components/HardwareBulkEdit';
+import ImportanceBadge, { formatDate, formatCost, isEosSoon, isEosPast, isWarrantySoon, isWarrantyPast } from '../components/ImportanceBadge';
+import Pagination from '../components/Pagination';
+import SortableHeader from '../components/SortableHeader';
+import { getPagination } from '../utils/pagination';
+import { sortHardware, HARDWARE_SORT_COLUMNS } from '../utils/hardwareSort';
+import { hardwareMatchesSearch } from '../utils/hardwareSearch';
 
 const IMPORTANCE_LEVELS = ['', 'low', 'medium', 'high', 'critical'];
 
@@ -14,18 +20,24 @@ export default function Hardware() {
   const [error, setError] = useState('');
   const [modal, setModal] = useState(null);
   const [showImport, setShowImport] = useState(false);
+  const [showBulkEdit, setShowBulkEdit] = useState(false);
   const [search, setSearch] = useState('');
   const [importanceFilter, setImportanceFilter] = useState('');
   const [eosFilter, setEosFilter] = useState('');
+  const [warrantyFilter, setWarrantyFilter] = useState('');
   const [revealedPasswords, setRevealedPasswords] = useState({});
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [deleting, setDeleting] = useState(false);
+  const [page, setPage] = useState(1);
+  const [sortKey, setSortKey] = useState('device');
+  const [sortDir, setSortDir] = useState('asc');
 
   const load = () => {
     setLoading(true);
     const params = {};
     if (importanceFilter) params.importance = importanceFilter;
     if (eosFilter === 'soon') params.eosSoon = 'true';
+    if (warrantyFilter === 'expired') params.warrantyExpired = 'true';
 
     Promise.all([api.getHardware(params), api.getRooms()])
       .then(([hw, rm]) => {
@@ -36,32 +48,37 @@ export default function Hardware() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(load, [importanceFilter, eosFilter]);
+  useEffect(load, [importanceFilter, eosFilter, warrantyFilter]);
 
-  const filtered = hardware.filter((item) => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return (
-      item.manufacturer?.toLowerCase().includes(q) ||
-      item.model?.toLowerCase().includes(q) ||
-      item.serial_number?.toLowerCase().includes(q) ||
-      item.ip_address?.toLowerCase().includes(q) ||
-      item.office_name?.toLowerCase().includes(q) ||
-      item.room_name?.toLowerCase().includes(q)
-    );
-  });
+  const filtered = hardware.filter((item) => hardwareMatchesSearch(item, search));
+
+  const sorted = sortHardware(filtered, sortKey, sortDir);
+  const { paginatedItems, totalPages, safePage, startIndex } = getPagination(sorted, page);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, importanceFilter, eosFilter, warrantyFilter, hardware.length, sortKey, sortDir]);
+
+  const handleSort = (key) => {
+    if (sortKey === key) {
+      setSortDir((dir) => (dir === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  };
 
   const allFilteredSelected =
-    filtered.length > 0 && filtered.every((item) => selectedIds.has(item.id));
+    sorted.length > 0 && sorted.every((item) => selectedIds.has(item.id));
   const selectedCount = selectedIds.size;
 
   const toggleSelectAll = () => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (allFilteredSelected) {
-        filtered.forEach((item) => next.delete(item.id));
+        sorted.forEach((item) => next.delete(item.id));
       } else {
-        filtered.forEach((item) => next.add(item.id));
+        sorted.forEach((item) => next.add(item.id));
       }
       return next;
     });
@@ -91,6 +108,13 @@ export default function Hardware() {
     } finally {
       setDeleting(false);
     }
+  };
+
+  const handleBulkEdit = async (updates) => {
+    await api.bulkUpdateHardware([...selectedIds], updates);
+    setShowBulkEdit(false);
+    setSelectedIds(new Set());
+    load();
   };
 
   const handleCreate = async (data) => {
@@ -127,6 +151,8 @@ export default function Hardware() {
   const rowClass = (item) => {
     if (isEosPast(item.end_of_support_date)) return 'eos-past';
     if (isEosSoon(item.end_of_support_date)) return 'eos-soon';
+    if (isWarrantyPast(item.end_of_warranty_date)) return 'eos-past';
+    if (isWarrantySoon(item.end_of_warranty_date)) return 'eos-soon';
     return '';
   };
 
@@ -153,7 +179,7 @@ export default function Hardware() {
       <div className="filters">
         <input
           type="search"
-          placeholder="Search manufacturer, model, serial, IP..."
+          placeholder="Search device name, serial, IP, location..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           style={{ minWidth: '260px' }}
@@ -171,9 +197,17 @@ export default function Hardware() {
           <option value="">All</option>
           <option value="soon">Within 90 days</option>
         </select>
+        <label htmlFor="warranty-filter">Warranty:</label>
+        <select id="warranty-filter" value={warrantyFilter} onChange={(e) => setWarrantyFilter(e.target.value)}>
+          <option value="">All</option>
+          <option value="expired">Expired</option>
+        </select>
         {selectedCount > 0 && (
           <>
             <span className="selection-count">{selectedCount} selected</span>
+            <button className="btn btn-secondary btn-sm" onClick={() => setShowBulkEdit(true)} disabled={deleting}>
+              Edit Selected
+            </button>
             <button className="btn btn-danger btn-sm" onClick={handleBulkDelete} disabled={deleting}>
               {deleting ? 'Deleting...' : 'Delete Selected'}
             </button>
@@ -205,19 +239,22 @@ export default function Hardware() {
                     />
                   </th>
                   <th className="col-num">#</th>
-                  <th>Device</th>
-                  <th>Location</th>
-                  <th>Importance</th>
-                  <th>IP</th>
-                  <th>Serial #</th>
-                  <th>EOS Date</th>
-                  <th>Est. Cost</th>
+                  {HARDWARE_SORT_COLUMNS.map((column) => (
+                    <SortableHeader
+                      key={column.key}
+                      label={column.label}
+                      sortKey={column.key}
+                      activeSort={sortKey}
+                      sortDir={sortDir}
+                      onSort={handleSort}
+                    />
+                  ))}
                   <th>Credentials</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((item, index) => (
+                {paginatedItems.map((item, index) => (
                   <tr key={item.id} className={`${rowClass(item)}${selectedIds.has(item.id) ? ' row-selected' : ''}`}>
                     <td className="col-check">
                       <input
@@ -227,7 +264,7 @@ export default function Hardware() {
                         aria-label={`Select ${item.manufacturer} ${item.model}`}
                       />
                     </td>
-                    <td className="col-num">{index + 1}</td>
+                    <td className="col-num">{startIndex + index + 1}</td>
                     <td>
                       <strong>
                         {item.manufacturer} {item.model}
@@ -243,6 +280,7 @@ export default function Hardware() {
                     <td>{item.ip_address || '—'}</td>
                     <td>{item.serial_number || '—'}</td>
                     <td>{formatDate(item.end_of_support_date)}</td>
+                    <td>{formatDate(item.end_of_warranty_date)}</td>
                     <td>{formatCost(item.estimated_replacement_cost)}</td>
                     <td>
                       {item.username && <div style={{ fontSize: '0.8rem' }}>{item.username}</div>}
@@ -273,7 +311,24 @@ export default function Hardware() {
               </tbody>
             </table>
           </div>
+          <Pagination
+            page={safePage}
+            totalPages={totalPages}
+            totalItems={sorted.length}
+            onPageChange={setPage}
+          />
         </div>
+      )}
+
+      {showBulkEdit && (
+        <Modal title="Bulk Edit Hardware" onClose={() => setShowBulkEdit(false)}>
+          <HardwareBulkEdit
+            selectedCount={selectedCount}
+            rooms={rooms}
+            onClose={() => setShowBulkEdit(false)}
+            onComplete={handleBulkEdit}
+          />
+        </Modal>
       )}
 
       {showImport && (

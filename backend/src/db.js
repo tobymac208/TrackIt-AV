@@ -45,11 +45,17 @@ db.exec(`
     password_encrypted TEXT,
     importance_level TEXT NOT NULL CHECK (importance_level IN ('low', 'medium', 'high', 'critical')),
     end_of_support_date TEXT,
+    end_of_warranty_date TEXT,
     upgrade_recommendations TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (conference_room_id) REFERENCES conference_rooms(id) ON DELETE SET NULL
   );
 `);
+
+const hardwareColumns = db.prepare('PRAGMA table_info(hardware)').all();
+if (!hardwareColumns.some((col) => col.name === 'end_of_warranty_date')) {
+  db.exec('ALTER TABLE hardware ADD COLUMN end_of_warranty_date TEXT');
+}
 
 module.exports = db;

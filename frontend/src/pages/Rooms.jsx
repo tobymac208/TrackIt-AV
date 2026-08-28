@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import Modal from '../components/Modal';
 import RoomForm from '../components/RoomForm';
+import Pagination from '../components/Pagination';
+import { getPagination } from '../utils/pagination';
 
 export default function Rooms() {
   const navigate = useNavigate();
@@ -12,6 +14,13 @@ export default function Rooms() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [modal, setModal] = useState(null);
+  const [page, setPage] = useState(1);
+
+  const { paginatedItems, totalPages, safePage, startIndex } = getPagination(rooms, page);
+
+  useEffect(() => {
+    setPage(1);
+  }, [officeFilter, rooms.length]);
 
   const load = () => {
     setLoading(true);
@@ -99,9 +108,9 @@ export default function Rooms() {
                 </tr>
               </thead>
               <tbody>
-                {rooms.map((room, index) => (
+                {paginatedItems.map((room, index) => (
                   <tr key={room.id} className="clickable" onClick={() => navigate(`/rooms/${room.id}`)}>
-                    <td className="col-num">{index + 1}</td>
+                    <td className="col-num">{startIndex + index + 1}</td>
                     <td>{room.name}</td>
                     <td>{room.office_name}</td>
                     <td>{room.hardware_count}</td>
@@ -120,6 +129,12 @@ export default function Rooms() {
               </tbody>
             </table>
           </div>
+          <Pagination
+            page={safePage}
+            totalPages={totalPages}
+            totalItems={rooms.length}
+            onPageChange={setPage}
+          />
         </div>
       )}
 

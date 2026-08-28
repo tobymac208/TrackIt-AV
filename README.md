@@ -58,6 +58,33 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 **Important:** Do not change `ENCRYPTION_KEY` after storing passwords, or existing credentials cannot be decrypted.
 
+## Backup
+
+The database and `.env` file are **not** in Git. Use the backup script to copy them to a dated folder under `Documents\AVTracker-backups`.
+
+From the project root in PowerShell:
+
+```powershell
+.\scripts\backup.ps1
+```
+
+Each run creates a timestamped folder, for example:
+
+```
+C:\Users\<you>\Documents\AVTracker-backups\2026-08-28_102045\
+├── avtracker.db
+└── .env
+```
+
+Optional parameters:
+
+| Parameter | Description |
+|-----------|-------------|
+| `-BackupRoot "D:\Backups\AVTracker"` | Custom backup location |
+| `-SkipEnv` | Database only (skip copying `backend/.env`) |
+
+For the most reliable copy, stop the backend before backing up. If `sqlite3` is installed (`winget install SQLite.SQLite`), the script uses SQLite's online backup so you can back up while the app is running.
+
 ## Usage
 
 1. **Create an office** — Go to Offices → Add Office
@@ -87,6 +114,7 @@ Optional columns:
 | `password` | Device login password (encrypted at rest) |
 | `importance_level` | `low`, `medium`, `high`, or `critical` (defaults to `medium`) |
 | `end_of_support_date` | Date in `YYYY-MM-DD` format |
+| `end_of_warranty_date` | Warranty expiration in `YYYY-MM-DD` format |
 | `upgrade_recommendations` | Upgrade notes |
 | `office` | Office name (use with `room` to disambiguate duplicate room names) |
 | `room` | Room name (matched on its own, or with `office`) |
@@ -132,6 +160,8 @@ AVTracker/
 │   │   ├── crypto.js
 │   │   └── routes/
 │   └── data/         # SQLite database (gitignored)
+├── scripts/
+│   └── backup.ps1    # Database + .env backup script
 ├── frontend/         # React + Vite
 │   └── src/
 │       ├── pages/

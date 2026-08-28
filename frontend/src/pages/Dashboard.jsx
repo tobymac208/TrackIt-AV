@@ -1,7 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
-import ImportanceBadge, { formatDate, isEosSoon, isEosPast } from '../components/ImportanceBadge';
+import ImportanceBadge, { formatDate, formatCost, isEosSoon, isEosPast, isWarrantyPast } from '../components/ImportanceBadge';
+import Pagination from '../components/Pagination';
+import { getPagination } from '../utils/pagination';
+import {
+  REPLACEMENT_CRITERIA,
+  REPLACEMENT_LEAD_TIME,
+  buildReplacementReview,
+} from '../utils/replacementReview';
 
 export default function Dashboard() {
   const [hardware, setHardware] = useState([]);
@@ -9,6 +16,9 @@ export default function Dashboard() {
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showAllAnnual, setShowAllAnnual] = useState(false);
+  const [reviewPage, setReviewPage] = useState(1);
+  const [eosAlertsPage, setEosAlertsPage] = useState(1);
 
   useEffect(() => {
     Promise.all([api.getHardware(), api.getOffices(), api.getRooms()])
@@ -21,12 +31,17 @@ export default function Dashboard() {
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    setReviewPage(1);
+  }, [showAllAnnual]);
+
   if (loading) return <div className="loading">Loading dashboard...</div>;
   if (error) return <div className="error-banner">{error}</div>;
 
   const unassigned = hardware.filter((h) => !h.conference_room_id).length;
   const eosSoon = hardware.filter((h) => isEosSoon(h.end_of_support_date));
   const eosPast = hardware.filter((h) => isEosPast(h.end_of_support_date));
+  const warrantyExpired = hardware.filter((h) => isWarrantyPast(h.end_of_warranty_date));
 
   const byImportance = {
     critical: hardware.filter((h) => h.importance_level === 'critical').length,
@@ -34,6 +49,22 @@ export default function Dashboard() {
     medium: hardware.filter((h) => h.importance_level === 'medium').length,
     low: hardware.filter((h) => h.importance_level === 'low').length,
   };
+
+  const review = buildReplacementReview(hardware);
+  const displayItems = showAllAnnual ? review.annualItems : review.priorityItems;
+  const {
+    paginatedItems: reviewPaginatedItems,
+    totalPages: reviewTotalPages,
+    safePage: reviewSafePage,
+    startIndex: reviewStartIndex,
+  } = getPagination(displayItems, reviewPage);
+
+  const eosAlerts = [...eosPast, ...eosSoon];
+  const {
+    paginatedItems: eosPaginatedItems,
+    totalPages: eosTotalPages,
+    safePage: eosSafePage,
+  } = getPagination(eosAlerts, eosAlertsPage);
 
   return (
     <div>
@@ -78,6 +109,133 @@ export default function Dashboard() {
             {eosPast.length}
           </div>
         </div>
+        <div className="stat-card">
+          <div className="label">Warranty Expired</div>
+          <div className="value" style={{ color: warrantyExpired.length ? '#dc2626' : undefined }}>
+            {warrantyExpired.length}
+          </div>
+        </div>
+      </div>
+
+      <div className="panel replacement-review-panel">
+        <div className="panel-header">Annual Replacement Review</div>
+        <div className="replacement-review-intro">
+          <p>
+            Presentation view for <strong>Critical</strong> and <strong>High</strong> importance hardware.
+            Priority items are past EOS, EOS within 90 days, out of warranty (Critical/High), or have a
+            replacement recommendation on file.
+          </p>
+          <div className="criteria-grid">
+            {Object.entries(REPLACEMENT_CRITERIA).map(([level, text]) => (
+              <div key={level} className="criteria-item">
+                <ImportanceBadge level={level} />
+                <span>{text}</span>
+              </div>
+            ))}
+          </div>
+          <p className="replacement-note">
+            Critical and High items should include a recommendation, ~{REPLACEMENT_LEAD_TIME} lead time, and
+            estimated cost when presenting to the business. Out-of-warranty Critical/High hardware is flagged
+            as a priority replacement.
+          </p>
+        </div>
+
+        <div className="card-grid replacement-stats">
+          <div className="stat-card">
+            <div className="label">Priority Replacements</div>
+            <div className="value">{review.priorityItems.length}</div>
+          </div>
+          <div className="stat-card">
+            <div className="label">Critical (Annual List)</div>
+            <div className="value">{review.criticalCount}</div>
+          </div>
+          <div className="stat-card">
+            <div className="label">High (Annual List)</div>
+            <div className="value">{review.highCount}</div>
+          </div>
+          <div className="stat-card">
+            <div className="label">Out of Warranty (Critical/High)</div>
+            <div className="value">{review.outOfWarrantyCount}</div>
+          </div>
+          <div className="stat-card">
+            <div className="label">Priority Est. Cost</div>
+            <div className="value" style={{ fontSize: '1.25rem' }}>
+              {formatCost(review.priorityEstimatedCost)}
+            </div>
+          </div>
+          <div className="stat-card">
+            <div className="label">All Critical/High Est. Cost</div>
+            <div className="value" style={{ fontSize: '1.25rem' }}>
+              {formatCost(review.totalEstimatedCost)}
+            </div>
+          </div>
+        </div>
+
+        <div className="filters" style={{ padding: '0 1.25rem 1rem' }}>
+          <label>
+            <input
+              type="checkbox"
+              checked={showAllAnnual}
+              onChange={(e) => setShowAllAnnual(e.target.checked)}
+            />{' '}
+            Show all Critical &amp; High hardware (full annual inventory)
+          </label>
+        </div>
+
+        {displayItems.length === 0 ? (
+          <div className="empty-state">
+            No {showAllAnnual ? 'Critical or High' : 'priority replacement'} hardware found.
+          </div>
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th className="col-num">#</th>
+                  <th>Device</th>
+                  <th>Location</th>
+                  <th>Importance</th>
+                  <th>Status</th>
+                  <th>EOS Date</th>
+                  <th>Warranty</th>
+                  <th>Recommendation</th>
+                  <th>Est. Cost</th>
+                  <th>Lead Time</th>
+                </tr>
+              </thead>
+              <tbody>
+                {reviewPaginatedItems.map((item, index) => (
+                  <tr key={item.id} className={item.replacementStatus.rowClass}>
+                    <td className="col-num">{reviewStartIndex + index + 1}</td>
+                    <td>
+                      <strong>
+                        {item.manufacturer} {item.model}
+                      </strong>
+                    </td>
+                    <td>{item.room_name ? `${item.office_name} — ${item.room_name}` : 'Unassigned'}</td>
+                    <td>
+                      <ImportanceBadge level={item.importance_level} />
+                    </td>
+                    <td>{item.replacementStatus.label}</td>
+                    <td>{formatDate(item.end_of_support_date)}</td>
+                    <td>{formatDate(item.end_of_warranty_date)}</td>
+                    <td style={{ maxWidth: '280px' }}>{item.recommendation}</td>
+                    <td>{formatCost(item.estimated_replacement_cost)}</td>
+                    <td>{REPLACEMENT_LEAD_TIME}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {displayItems.length > 0 && (
+          <Pagination
+            page={reviewSafePage}
+            totalPages={reviewTotalPages}
+            totalItems={displayItems.length}
+            onPageChange={setReviewPage}
+          />
+        )}
       </div>
 
       <div className="card-grid">
@@ -93,7 +251,7 @@ export default function Dashboard() {
 
       {(eosSoon.length > 0 || eosPast.length > 0) && (
         <div className="panel">
-          <div className="panel-header">End of Support Alerts</div>
+          <div className="panel-header">End of Support Alerts (All Hardware)</div>
           <div className="table-wrap">
             <table>
               <thead>
@@ -106,7 +264,7 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody>
-                {[...eosPast, ...eosSoon].map((item) => (
+                {eosPaginatedItems.map((item) => (
                   <tr key={item.id} className={isEosPast(item.end_of_support_date) ? 'eos-past' : 'eos-soon'}>
                     <td>
                       {item.manufacturer} {item.model}
@@ -124,6 +282,12 @@ export default function Dashboard() {
               </tbody>
             </table>
           </div>
+          <Pagination
+            page={eosSafePage}
+            totalPages={eosTotalPages}
+            totalItems={eosAlerts.length}
+            onPageChange={setEosAlertsPage}
+          />
         </div>
       )}
     </div>

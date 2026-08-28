@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react';
 import { api } from '../api/client';
 
-const TEMPLATE_CSV = `manufacturer,model,description,estimated_replacement_cost,mac_address,ip_address,serial_number,software_version,username,password,importance_level,end_of_support_date,upgrade_recommendations,office,room
-Crestron,DM-NVX-363,Primary video encoder,2500.00,00:1A:2B:3C:4D:5E,192.168.1.100,SN-12345,1.5023.00041,admin,secret123,high,2027-06-30,Upgrade to NVX-384 when budget allows,Minneapolis HQ,Boardroom A
+const TEMPLATE_CSV = `manufacturer,model,description,estimated_replacement_cost,mac_address,ip_address,serial_number,software_version,username,password,importance_level,end_of_support_date,end_of_warranty_date,upgrade_recommendations,office,room
+Crestron,DM-NVX-363,Primary video encoder,2500.00,00:1A:2B:3C:4D:5E,192.168.1.100,SN-12345,1.5023.00041,admin,secret123,high,2027-06-30,2026-12-31,Upgrade to NVX-384 when budget allows,Minneapolis HQ,Boardroom A
 `;
 
 export default function HardwareImport({ onClose, onComplete }) {

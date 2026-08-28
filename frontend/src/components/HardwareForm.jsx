@@ -15,6 +15,7 @@ const emptyForm = {
   password: '',
   importanceLevel: 'medium',
   endOfSupportDate: '',
+  endOfWarrantyDate: '',
   upgradeRecommendations: '',
   conferenceRoomId: '',
 };
@@ -36,6 +37,7 @@ export default function HardwareForm({ initial, rooms = [], onSubmit }) {
           password: '',
           importanceLevel: initial.importance_level || 'medium',
           endOfSupportDate: initial.end_of_support_date || '',
+          endOfWarrantyDate: initial.end_of_warranty_date || '',
           upgradeRecommendations: initial.upgrade_recommendations || '',
           conferenceRoomId: initial.conference_room_id?.toString() || '',
         }
@@ -66,6 +68,7 @@ export default function HardwareForm({ initial, rooms = [], onSubmit }) {
         password: form.password || undefined,
         importanceLevel: form.importanceLevel,
         endOfSupportDate: form.endOfSupportDate || null,
+        endOfWarrantyDate: form.endOfWarrantyDate || null,
         upgradeRecommendations: form.upgradeRecommendations || null,
         conferenceRoomId: form.conferenceRoomId ? Number(form.conferenceRoomId) : null,
       });
@@ -131,6 +134,10 @@ export default function HardwareForm({ initial, rooms = [], onSubmit }) {
         <div className="form-field">
           <label>End of Support Date</label>
           <input type="date" value={form.endOfSupportDate} onChange={set('endOfSupportDate')} />
+        </div>
+        <div className="form-field">
+          <label>End of Warranty Date</label>
+          <input type="date" value={form.endOfWarrantyDate} onChange={set('endOfWarrantyDate')} />
         </div>
         {rooms.length > 0 && (
           <div className="form-field">

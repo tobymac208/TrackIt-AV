@@ -2,12 +2,21 @@ import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import Modal from '../components/Modal';
 import OfficeForm from '../components/OfficeForm';
+import Pagination from '../components/Pagination';
+import { getPagination } from '../utils/pagination';
 
 export default function Offices() {
   const [offices, setOffices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [modal, setModal] = useState(null);
+  const [page, setPage] = useState(1);
+
+  const { paginatedItems, totalPages, safePage, startIndex } = getPagination(offices, page);
+
+  useEffect(() => {
+    setPage(1);
+  }, [offices.length]);
 
   const load = () => {
     setLoading(true);
@@ -73,9 +82,9 @@ export default function Offices() {
                 </tr>
               </thead>
               <tbody>
-                {offices.map((office, index) => (
+                {paginatedItems.map((office, index) => (
                   <tr key={office.id}>
-                    <td className="col-num">{index + 1}</td>
+                    <td className="col-num">{startIndex + index + 1}</td>
                     <td>{office.name}</td>
                     <td>{office.room_count}</td>
                     <td>{new Date(office.created_at).toLocaleDateString()}</td>
@@ -94,6 +103,12 @@ export default function Offices() {
               </tbody>
             </table>
           </div>
+          <Pagination
+            page={safePage}
+            totalPages={totalPages}
+            totalItems={offices.length}
+            onPageChange={setPage}
+          />
         </div>
       )}
 

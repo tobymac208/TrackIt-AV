@@ -12,8 +12,8 @@ const insertHardwareStmt = db.prepare(`
   INSERT INTO hardware (
     conference_room_id, manufacturer, model, description, estimated_replacement_cost,
     mac_address, ip_address, serial_number, software_version, username, password_encrypted,
-    importance_level, end_of_support_date, upgrade_recommendations
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    importance_level, end_of_support_date, end_of_warranty_date, upgrade_recommendations
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `);
 
 function mapHardwareRow(row, includePassword = false) {
@@ -92,6 +92,7 @@ function insertHardwareRecord(data) {
     data.password ? encrypt(data.password) : null,
     data.importanceLevel,
     data.endOfSupportDate || null,
+    data.endOfWarrantyDate || null,
     data.upgradeRecommendations || null
   );
 
@@ -116,6 +117,11 @@ function validateImportRow(row, offices, roomIndex) {
   const endOfSupportDate = normalizeDate(row.endOfSupportDate);
   if (row.endOfSupportDate && !endOfSupportDate) {
     errors.push('End of support date must be YYYY-MM-DD or a valid date');
+  }
+
+  const endOfWarrantyDate = normalizeDate(row.endOfWarrantyDate);
+  if (row.endOfWarrantyDate && !endOfWarrantyDate) {
+    errors.push('End of warranty date must be YYYY-MM-DD or a valid date');
   }
 
   const roomResult = resolveConferenceRoomLocation(
@@ -143,6 +149,7 @@ function validateImportRow(row, offices, roomIndex) {
           password: row.password || null,
           importanceLevel,
           endOfSupportDate,
+          endOfWarrantyDate,
           upgradeRecommendations: row.upgradeRecommendations || null,
           conferenceRoomId: roomResult.conferenceRoomId ?? null,
         },
@@ -200,8 +207,98 @@ router.post('/import', (req, res) => {
   });
 });
 
+router.patch('/bulk-update', (req, res) => {
+  const { ids, updates } = req.body;
+
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ error: 'At least one hardware id is required' });
+  }
+  if (!updates || typeof updates !== 'object') {
+    return res.status(400).json({ error: 'Updates object is required' });
+  }
+
+  const setClauses = [];
+  const values = [];
+
+  if (updates.importanceLevel !== undefined) {
+    if (!IMPORTANCE_LEVELS.includes(updates.importanceLevel)) {
+      return res.status(400).json({ error: 'Importance level must be low, medium, high, or critical' });
+    }
+    setClauses.push('importance_level = ?');
+    values.push(updates.importanceLevel);
+  }
+
+  if (updates.endOfSupportDate !== undefined) {
+    if (updates.endOfSupportDate === null) {
+      setClauses.push('end_of_support_date = NULL');
+    } else {
+      const date = normalizeDate(updates.endOfSupportDate);
+      if (!date) {
+        return res.status(400).json({ error: 'End of support date must be YYYY-MM-DD or a valid date' });
+      }
+      setClauses.push('end_of_support_date = ?');
+      values.push(date);
+    }
+  }
+
+  if (updates.endOfWarrantyDate !== undefined) {
+    if (updates.endOfWarrantyDate === null) {
+      setClauses.push('end_of_warranty_date = NULL');
+    } else {
+      const date = normalizeDate(updates.endOfWarrantyDate);
+      if (!date) {
+        return res.status(400).json({ error: 'End of warranty date must be YYYY-MM-DD or a valid date' });
+      }
+      setClauses.push('end_of_warranty_date = ?');
+      values.push(date);
+    }
+  }
+
+  if (updates.upgradeRecommendations !== undefined) {
+    setClauses.push('upgrade_recommendations = ?');
+    values.push(updates.upgradeRecommendations || null);
+  }
+
+  if (updates.estimatedReplacementCost !== undefined) {
+    const cost =
+      updates.estimatedReplacementCost === null || updates.estimatedReplacementCost === ''
+        ? null
+        : parseCost(updates.estimatedReplacementCost);
+    if (updates.estimatedReplacementCost != null && updates.estimatedReplacementCost !== '' && cost === null) {
+      return res.status(400).json({ error: 'Estimated replacement cost must be a number' });
+    }
+    setClauses.push('estimated_replacement_cost = ?');
+    values.push(cost);
+  }
+
+  if (updates.conferenceRoomId !== undefined) {
+    if (updates.conferenceRoomId !== null) {
+      const room = db.prepare('SELECT id FROM conference_rooms WHERE id = ?').get(updates.conferenceRoomId);
+      if (!room) {
+        return res.status(400).json({ error: 'Conference room not found' });
+      }
+    }
+    setClauses.push('conference_room_id = ?');
+    values.push(updates.conferenceRoomId);
+  }
+
+  if (setClauses.length === 0) {
+    return res.status(400).json({ error: 'No fields selected to update' });
+  }
+
+  setClauses.push("updated_at = datetime('now')");
+
+  const uniqueIds = [...new Set(ids.map(Number))].filter(Boolean);
+  const placeholders = uniqueIds.map(() => '?').join(', ');
+  const result = db.prepare(
+    `UPDATE hardware SET ${setClauses.join(', ')} WHERE id IN (${placeholders})`
+  ).run(...values, ...uniqueIds);
+
+  res.json({ updated: result.changes, ids: uniqueIds });
+});
+
 router.get('/', (req, res) => {
-  const { importance, unassigned, eosSoon } = req.query;
+  const { importance, unassigned, eosSoon, warrantyExpired } = req.query;
   const conditions = [];
   const params = [];
 
@@ -214,6 +311,9 @@ router.get('/', (req, res) => {
   }
   if (eosSoon === 'true') {
     conditions.push("h.end_of_support_date IS NOT NULL AND h.end_of_support_date <= date('now', '+90 days')");
+  }
+  if (warrantyExpired === 'true') {
+    conditions.push("h.end_of_warranty_date IS NOT NULL AND h.end_of_warranty_date < date('now')");
   }
 
   const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -249,6 +349,7 @@ router.post('/', (req, res) => {
     password,
     importanceLevel,
     endOfSupportDate,
+    endOfWarrantyDate,
     upgradeRecommendations,
     conferenceRoomId,
   } = req.body;
@@ -274,6 +375,7 @@ router.post('/', (req, res) => {
     password ? encrypt(password) : null,
     importanceLevel,
     endOfSupportDate || null,
+    endOfWarrantyDate || null,
     upgradeRecommendations || null
   );
 
@@ -305,6 +407,7 @@ router.put('/:id', (req, res) => {
     password,
     importanceLevel = existing.importance_level,
     endOfSupportDate = existing.end_of_support_date,
+    endOfWarrantyDate = existing.end_of_warranty_date,
     upgradeRecommendations = existing.upgrade_recommendations,
     conferenceRoomId = existing.conference_room_id,
   } = req.body;
@@ -336,6 +439,7 @@ router.put('/:id', (req, res) => {
       password_encrypted = ?,
       importance_level = ?,
       end_of_support_date = ?,
+      end_of_warranty_date = ?,
       upgrade_recommendations = ?,
       updated_at = datetime('now')
     WHERE id = ?
@@ -353,6 +457,7 @@ router.put('/:id', (req, res) => {
     passwordEncrypted,
     importanceLevel,
     endOfSupportDate || null,
+    endOfWarrantyDate || null,
     upgradeRecommendations || null,
     req.params.id
   );
