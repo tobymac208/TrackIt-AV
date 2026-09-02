@@ -1,7 +1,9 @@
 const express = require('express');
 const db = require('../db');
+const asyncHandler = require('../asyncHandler');
 const { encrypt, decrypt } = require('../crypto');
 const { parseCsv } = require('../csvParser');
+const { normalizeMacAddress } = require('../macAddress');
 const { loadRoomIndex, loadOffices, resolveConferenceRoomLocation } = require('../roomMatcher');
 
 const router = express.Router();
@@ -77,14 +79,14 @@ function normalizeDate(value) {
   return parsed.toISOString().slice(0, 10);
 }
 
-function insertHardwareRecord(data) {
-  const result = insertHardwareStmt.run(
+async function insertHardwareRecord(data) {
+  const result = await insertHardwareStmt.run(
     data.conferenceRoomId || null,
     data.manufacturer.trim(),
     data.model.trim(),
     data.description || null,
     data.estimatedReplacementCost ?? null,
-    data.macAddress || null,
+    data.macAddress ? normalizeMacAddress(data.macAddress) : null,
     data.ipAddress || null,
     data.serialNumber || null,
     data.softwareVersion || null,
@@ -96,7 +98,7 @@ function insertHardwareRecord(data) {
     data.upgradeRecommendations || null
   );
 
-  return db.prepare(buildHardwareQuery('WHERE h.id = ?')).get(result.lastInsertRowid);
+  return await db.prepare(buildHardwareQuery('WHERE h.id = ?')).get(result.lastInsertRowid);
 }
 
 function validateImportRow(row, offices, roomIndex) {
@@ -141,7 +143,7 @@ function validateImportRow(row, offices, roomIndex) {
           model: row.model,
           description: row.description || null,
           estimatedReplacementCost,
-          macAddress: row.macAddress || null,
+          macAddress: row.macAddress ? normalizeMacAddress(row.macAddress) : null,
           ipAddress: row.ipAddress || null,
           serialNumber: row.serialNumber || null,
           softwareVersion: row.softwareVersion || null,
@@ -156,58 +158,61 @@ function validateImportRow(row, offices, roomIndex) {
   };
 }
 
-router.post('/import', (req, res) => {
-  const { csv } = req.body;
-  if (!csv || !csv.trim()) {
-    return res.status(400).json({ error: 'CSV content is required' });
-  }
-
-  let rows;
-  try {
-    rows = parseCsv(csv);
-  } catch (err) {
-    return res.status(400).json({ error: err.message });
-  }
-
-  if (rows.length === 0) {
-    return res.status(400).json({ error: 'CSV contains no data rows' });
-  }
-
-  const offices = loadOffices(db);
-  const roomIndex = loadRoomIndex(db);
-
-  const imported = [];
-  const failed = [];
-  const warnings = [];
-
-  rows.forEach((row) => {
-    const { errors, warnings: rowWarnings, data } = validateImportRow(row, offices, roomIndex);
-    if (errors.length) {
-      failed.push({ line: row._line, errors });
-      return;
+router.post(
+  '/import',
+  asyncHandler(async (req, res) => {
+    const { csv } = req.body;
+    if (!csv || !csv.trim()) {
+      return res.status(400).json({ error: 'CSV content is required' });
     }
 
-    rowWarnings.forEach((message) => {
-      warnings.push({ line: row._line, message });
-    });
-
+    let rows;
     try {
-      const created = insertHardwareRecord(data);
-      imported.push(mapHardwareRow(created));
+      rows = parseCsv(csv);
     } catch (err) {
-      failed.push({ line: row._line, errors: [err.message] });
+      return res.status(400).json({ error: err.message });
     }
-  });
 
-  res.json({
-    imported: imported.length,
-    failed,
-    warnings,
-    items: imported,
-  });
-});
+    if (rows.length === 0) {
+      return res.status(400).json({ error: 'CSV contains no data rows' });
+    }
 
-router.patch('/bulk-update', (req, res) => {
+    const offices = await loadOffices(db);
+    const roomIndex = await loadRoomIndex(db);
+
+    const imported = [];
+    const failed = [];
+    const warnings = [];
+
+    for (const row of rows) {
+      const { errors, warnings: rowWarnings, data } = validateImportRow(row, offices, roomIndex);
+      if (errors.length) {
+        failed.push({ line: row._line, errors });
+        continue;
+      }
+
+      rowWarnings.forEach((message) => {
+        warnings.push({ line: row._line, message });
+      });
+
+      try {
+        const created = await insertHardwareRecord(data);
+        imported.push(mapHardwareRow(created));
+      } catch (err) {
+        failed.push({ line: row._line, errors: [err.message] });
+      }
+    }
+
+    res.json({
+      imported: imported.length,
+      failed,
+      warnings,
+      items: imported,
+    });
+  })
+);
+
+router.patch('/bulk-update', asyncHandler(async (req, res) => {
   const { ids, updates } = req.body;
 
   if (!Array.isArray(ids) || ids.length === 0) {
@@ -273,7 +278,7 @@ router.patch('/bulk-update', (req, res) => {
 
   if (updates.conferenceRoomId !== undefined) {
     if (updates.conferenceRoomId !== null) {
-      const room = db.prepare('SELECT id FROM conference_rooms WHERE id = ?').get(updates.conferenceRoomId);
+      const room = await db.prepare('SELECT id FROM conference_rooms WHERE id = ?').get(updates.conferenceRoomId);
       if (!room) {
         return res.status(400).json({ error: 'Conference room not found' });
       }
@@ -290,47 +295,58 @@ router.patch('/bulk-update', (req, res) => {
 
   const uniqueIds = [...new Set(ids.map(Number))].filter(Boolean);
   const placeholders = uniqueIds.map(() => '?').join(', ');
-  const result = db.prepare(
-    `UPDATE hardware SET ${setClauses.join(', ')} WHERE id IN (${placeholders})`
-  ).run(...values, ...uniqueIds);
+  const result = await db
+    .prepare(`UPDATE hardware SET ${setClauses.join(', ')} WHERE id IN (${placeholders})`)
+    .run(...values, ...uniqueIds);
 
   res.json({ updated: result.changes, ids: uniqueIds });
-});
+}));
 
-router.get('/', (req, res) => {
-  const { importance, unassigned, eosSoon, warrantyExpired } = req.query;
-  const conditions = [];
-  const params = [];
+router.get(
+  '/',
+  asyncHandler(async (req, res) => {
+    const { importance, unassigned, eosSoon, warrantyExpired } = req.query;
+    const conditions = [];
+    const params = [];
 
-  if (importance) {
-    conditions.push('h.importance_level = ?');
-    params.push(importance);
-  }
-  if (unassigned === 'true') {
-    conditions.push('h.conference_room_id IS NULL');
-  }
-  if (eosSoon === 'true') {
-    conditions.push("h.end_of_support_date IS NOT NULL AND h.end_of_support_date <= date('now', '+90 days')");
-  }
-  if (warrantyExpired === 'true') {
-    conditions.push("h.end_of_warranty_date IS NOT NULL AND h.end_of_warranty_date < date('now')");
-  }
+    if (importance) {
+      conditions.push('h.importance_level = ?');
+      params.push(importance);
+    }
+    if (unassigned === 'true') {
+      conditions.push('h.conference_room_id IS NULL');
+    }
+    if (eosSoon === 'true') {
+      conditions.push("h.end_of_support_date IS NOT NULL AND h.end_of_support_date <= date('now', '+90 days')");
+    }
+    if (warrantyExpired === 'true') {
+      conditions.push("h.end_of_warranty_date IS NOT NULL AND h.end_of_warranty_date < date('now')");
+    }
 
-  const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
-  const rows = db.prepare(buildHardwareQuery(whereClause)).all(...params);
-  res.json(rows.map((row) => mapHardwareRow(row)));
-});
+    const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const rows = await db.prepare(buildHardwareQuery(whereClause)).all(...params);
+    res.json(rows.map((row) => mapHardwareRow(row)));
+  })
+);
 
-router.get('/:id', (req, res) => {
-  const { revealPassword } = req.query;
-  const row = db.prepare(buildHardwareQuery('WHERE h.id = ?')).get(req.params.id);
-  if (!row) {
-    return res.status(404).json({ error: 'Hardware not found' });
-  }
-  res.json(mapHardwareRow(row, revealPassword === 'true'));
-});
+router.get(
+  '/:id',
+  asyncHandler(async (req, res) => {
+    const { revealPassword } = req.query;
+    if (revealPassword === 'true' && req.user?.role !== 'admin') {
+      return res.status(403).json({ error: 'View-only users cannot reveal passwords' });
+    }
+    const row = await db.prepare(buildHardwareQuery('WHERE h.id = ?')).get(req.params.id);
+    if (!row) {
+      return res.status(404).json({ error: 'Hardware not found' });
+    }
+    res.json(mapHardwareRow(row, revealPassword === 'true'));
+  })
+);
 
-router.post('/', (req, res) => {
+router.post(
+  '/',
+  asyncHandler(async (req, res) => {
   const errors = validateHardware(req.body);
   if (errors.length) {
     return res.status(400).json({ error: errors.join('; ') });
@@ -355,19 +371,19 @@ router.post('/', (req, res) => {
   } = req.body;
 
   if (conferenceRoomId) {
-    const room = db.prepare('SELECT id FROM conference_rooms WHERE id = ?').get(conferenceRoomId);
+    const room = await db.prepare('SELECT id FROM conference_rooms WHERE id = ?').get(conferenceRoomId);
     if (!room) {
       return res.status(400).json({ error: 'Conference room not found' });
     }
   }
 
-  const result = insertHardwareStmt.run(
+  const result = await insertHardwareStmt.run(
     conferenceRoomId || null,
     manufacturer.trim(),
     model.trim(),
     description || null,
     estimatedReplacementCost ?? null,
-    macAddress || null,
+    macAddress ? normalizeMacAddress(macAddress) : null,
     ipAddress || null,
     serialNumber || null,
     softwareVersion || null,
@@ -379,12 +395,15 @@ router.post('/', (req, res) => {
     upgradeRecommendations || null
   );
 
-  const row = db.prepare(buildHardwareQuery('WHERE h.id = ?')).get(result.lastInsertRowid);
+  const row = await db.prepare(buildHardwareQuery('WHERE h.id = ?')).get(result.lastInsertRowid);
   res.status(201).json(mapHardwareRow(row));
-});
+  })
+);
 
-router.put('/:id', (req, res) => {
-  const existing = db.prepare('SELECT * FROM hardware WHERE id = ?').get(req.params.id);
+router.put(
+  '/:id',
+  asyncHandler(async (req, res) => {
+  const existing = await db.prepare('SELECT * FROM hardware WHERE id = ?').get(req.params.id);
   if (!existing) {
     return res.status(404).json({ error: 'Hardware not found' });
   }
@@ -413,7 +432,7 @@ router.put('/:id', (req, res) => {
   } = req.body;
 
   if (conferenceRoomId) {
-    const room = db.prepare('SELECT id FROM conference_rooms WHERE id = ?').get(conferenceRoomId);
+    const room = await db.prepare('SELECT id FROM conference_rooms WHERE id = ?').get(conferenceRoomId);
     if (!room) {
       return res.status(400).json({ error: 'Conference room not found' });
     }
@@ -424,7 +443,9 @@ router.put('/:id', (req, res) => {
     passwordEncrypted = password ? encrypt(password) : null;
   }
 
-  db.prepare(`
+  await db
+    .prepare(
+      `
     UPDATE hardware SET
       conference_room_id = ?,
       manufacturer = ?,
@@ -443,60 +464,73 @@ router.put('/:id', (req, res) => {
       upgrade_recommendations = ?,
       updated_at = datetime('now')
     WHERE id = ?
-  `).run(
-    conferenceRoomId || null,
-    manufacturer.trim(),
-    model.trim(),
-    description || null,
-    estimatedReplacementCost ?? null,
-    macAddress || null,
-    ipAddress || null,
-    serialNumber || null,
-    softwareVersion || null,
-    username || null,
-    passwordEncrypted,
-    importanceLevel,
-    endOfSupportDate || null,
-    endOfWarrantyDate || null,
-    upgradeRecommendations || null,
-    req.params.id
-  );
+  `
+    )
+    .run(
+      conferenceRoomId || null,
+      manufacturer.trim(),
+      model.trim(),
+      description || null,
+      estimatedReplacementCost ?? null,
+      macAddress ? normalizeMacAddress(macAddress) : null,
+      ipAddress || null,
+      serialNumber || null,
+      softwareVersion || null,
+      username || null,
+      passwordEncrypted,
+      importanceLevel,
+      endOfSupportDate || null,
+      endOfWarrantyDate || null,
+      upgradeRecommendations || null,
+      req.params.id
+    );
 
-  const row = db.prepare(buildHardwareQuery('WHERE h.id = ?')).get(req.params.id);
+  const row = await db.prepare(buildHardwareQuery('WHERE h.id = ?')).get(req.params.id);
   res.json(mapHardwareRow(row));
-});
+  })
+);
 
-router.patch('/:id/assign', (req, res) => {
-  const existing = db.prepare('SELECT id FROM hardware WHERE id = ?').get(req.params.id);
-  if (!existing) {
-    return res.status(404).json({ error: 'Hardware not found' });
-  }
-
-  const { conferenceRoomId } = req.body;
-  if (conferenceRoomId !== null && conferenceRoomId !== undefined) {
-    const room = db.prepare('SELECT id FROM conference_rooms WHERE id = ?').get(conferenceRoomId);
-    if (!room) {
-      return res.status(400).json({ error: 'Conference room not found' });
+router.patch(
+  '/:id/assign',
+  asyncHandler(async (req, res) => {
+    const existing = await db.prepare('SELECT id FROM hardware WHERE id = ?').get(req.params.id);
+    if (!existing) {
+      return res.status(404).json({ error: 'Hardware not found' });
     }
-  }
 
-  db.prepare(`
+    const { conferenceRoomId } = req.body;
+    if (conferenceRoomId !== null && conferenceRoomId !== undefined) {
+      const room = await db.prepare('SELECT id FROM conference_rooms WHERE id = ?').get(conferenceRoomId);
+      if (!room) {
+        return res.status(400).json({ error: 'Conference room not found' });
+      }
+    }
+
+    await db
+      .prepare(
+        `
     UPDATE hardware SET conference_room_id = ?, updated_at = datetime('now')
     WHERE id = ?
-  `).run(conferenceRoomId ?? null, req.params.id);
+  `
+      )
+      .run(conferenceRoomId ?? null, req.params.id);
 
-  const row = db.prepare(buildHardwareQuery('WHERE h.id = ?')).get(req.params.id);
-  res.json(mapHardwareRow(row));
-});
+    const row = await db.prepare(buildHardwareQuery('WHERE h.id = ?')).get(req.params.id);
+    res.json(mapHardwareRow(row));
+  })
+);
 
-router.delete('/:id', (req, res) => {
-  const existing = db.prepare('SELECT id FROM hardware WHERE id = ?').get(req.params.id);
-  if (!existing) {
-    return res.status(404).json({ error: 'Hardware not found' });
-  }
+router.delete(
+  '/:id',
+  asyncHandler(async (req, res) => {
+    const existing = await db.prepare('SELECT id FROM hardware WHERE id = ?').get(req.params.id);
+    if (!existing) {
+      return res.status(404).json({ error: 'Hardware not found' });
+    }
 
-  db.prepare('DELETE FROM hardware WHERE id = ?').run(req.params.id);
-  res.status(204).send();
-});
+    await db.prepare('DELETE FROM hardware WHERE id = ?').run(req.params.id);
+    res.status(204).send();
+  })
+);
 
 module.exports = router;

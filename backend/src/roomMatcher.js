@@ -30,7 +30,7 @@ function roomNamesMatch(a, b) {
   return normalizeRoomKey(a) === normalizeRoomKey(b);
 }
 
-function loadRoomIndex(db) {
+async function loadRoomIndex(db) {
   return db.prepare(`
     SELECT cr.id, cr.name AS room_name, o.id AS office_id, o.name AS office_name
     FROM conference_rooms cr
@@ -38,7 +38,7 @@ function loadRoomIndex(db) {
   `).all();
 }
 
-function loadOffices(db) {
+async function loadOffices(db) {
   return db.prepare('SELECT id, name FROM offices').all();
 }
 

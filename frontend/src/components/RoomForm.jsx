@@ -1,8 +1,14 @@
 import { useState } from 'react';
 
+const ROOM_STATUSES = [
+  { value: 'functional', label: 'Functional' },
+  { value: 'issue', label: 'Issue' },
+];
+
 export default function RoomForm({ initial, offices, onSubmit, onCancel }) {
   const [name, setName] = useState(initial?.name || '');
   const [officeId, setOfficeId] = useState(initial?.office_id?.toString() || offices[0]?.id?.toString() || '');
+  const [status, setStatus] = useState(initial?.status || 'functional');
   const [error, setError] = useState('');
 
   const handleSubmit = async (e) => {
@@ -17,7 +23,7 @@ export default function RoomForm({ initial, offices, onSubmit, onCancel }) {
     }
     setError('');
     try {
-      await onSubmit({ name: name.trim(), officeId: Number(officeId) });
+      await onSubmit({ name: name.trim(), officeId: Number(officeId), status });
     } catch (err) {
       setError(err.message);
     }
@@ -51,6 +57,18 @@ export default function RoomForm({ initial, offices, onSubmit, onCancel }) {
             placeholder="e.g. Boardroom A"
             autoFocus
           />
+        </div>
+        <div className="form-field full-width">
+          <label htmlFor="room-status" className="required">
+            Status
+          </label>
+          <select id="room-status" value={status} onChange={(e) => setStatus(e.target.value)}>
+            {ROOM_STATUSES.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
     </form>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
+import { useAuth } from '../auth';
 import Modal from '../components/Modal';
 import HardwareForm from '../components/HardwareForm';
 import HardwareImport from '../components/HardwareImport';
@@ -14,6 +15,7 @@ import { hardwareMatchesSearch } from '../utils/hardwareSearch';
 const IMPORTANCE_LEVELS = ['', 'low', 'medium', 'high', 'critical'];
 
 export default function Hardware() {
+  const { isAdmin } = useAuth();
   const [hardware, setHardware] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -166,14 +168,16 @@ export default function Hardware() {
             {filtered.length !== hardware.length && ` (of ${hardware.length} total)`}
           </p>
         </div>
-        <div className="actions">
-          <button className="btn btn-secondary" onClick={() => setShowImport(true)}>
-            Import CSV
-          </button>
-          <button className="btn btn-primary" onClick={() => setModal({ mode: 'create' })}>
-            Add Hardware
-          </button>
-        </div>
+        {isAdmin && (
+          <div className="actions">
+            <button className="btn btn-secondary" onClick={() => setShowImport(true)}>
+              Import CSV
+            </button>
+            <button className="btn btn-primary" onClick={() => setModal({ mode: 'create' })}>
+              Add Hardware
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="filters">
@@ -202,7 +206,7 @@ export default function Hardware() {
           <option value="">All</option>
           <option value="expired">Expired</option>
         </select>
-        {selectedCount > 0 && (
+        {isAdmin && selectedCount > 0 && (
           <>
             <span className="selection-count">{selectedCount} selected</span>
             <button className="btn btn-secondary btn-sm" onClick={() => setShowBulkEdit(true)} disabled={deleting}>
@@ -229,15 +233,17 @@ export default function Hardware() {
             <table>
               <thead>
                 <tr>
-                  <th className="col-check">
-                    <input
-                      type="checkbox"
-                      checked={allFilteredSelected}
-                      onChange={toggleSelectAll}
-                      aria-label="Select all visible devices"
-                      title="Select all visible"
-                    />
-                  </th>
+                  {isAdmin && (
+                    <th className="col-check">
+                      <input
+                        type="checkbox"
+                        checked={allFilteredSelected}
+                        onChange={toggleSelectAll}
+                        aria-label="Select all visible devices"
+                        title="Select all visible"
+                      />
+                    </th>
+                  )}
                   <th className="col-num">#</th>
                   {HARDWARE_SORT_COLUMNS.map((column) => (
                     <SortableHeader
@@ -250,20 +256,22 @@ export default function Hardware() {
                     />
                   ))}
                   <th>Credentials</th>
-                  <th>Actions</th>
+                  {isAdmin && <th>Actions</th>}
                 </tr>
               </thead>
               <tbody>
                 {paginatedItems.map((item, index) => (
-                  <tr key={item.id} className={`${rowClass(item)}${selectedIds.has(item.id) ? ' row-selected' : ''}`}>
-                    <td className="col-check">
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.has(item.id)}
-                        onChange={() => toggleSelect(item.id)}
-                        aria-label={`Select ${item.manufacturer} ${item.model}`}
-                      />
-                    </td>
+                  <tr key={item.id} className={`${rowClass(item)}${isAdmin && selectedIds.has(item.id) ? ' row-selected' : ''}`}>
+                    {isAdmin && (
+                      <td className="col-check">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(item.id)}
+                          onChange={() => toggleSelect(item.id)}
+                          aria-label={`Select ${item.manufacturer} ${item.model}`}
+                        />
+                      </td>
+                    )}
                     <td className="col-num">{startIndex + index + 1}</td>
                     <td>
                       <strong>
@@ -285,27 +293,33 @@ export default function Hardware() {
                     <td>
                       {item.username && <div style={{ fontSize: '0.8rem' }}>{item.username}</div>}
                       {item.has_password ? (
-                        revealedPasswords[item.id] ? (
-                          <code style={{ fontSize: '0.75rem' }}>{revealedPasswords[item.id]}</code>
+                        isAdmin ? (
+                          revealedPasswords[item.id] ? (
+                            <code style={{ fontSize: '0.75rem' }}>{revealedPasswords[item.id]}</code>
+                          ) : (
+                            <button className="btn-link" onClick={() => revealPassword(item.id)}>
+                              Reveal password
+                            </button>
+                          )
                         ) : (
-                          <button className="btn-link" onClick={() => revealPassword(item.id)}>
-                            Reveal password
-                          </button>
+                          <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Hidden</span>
                         )
                       ) : (
                         '—'
                       )}
                     </td>
-                    <td>
-                      <div className="actions">
-                        <button className="btn btn-secondary btn-sm" onClick={() => setModal({ mode: 'edit', ...item })}>
-                          Edit
-                        </button>
-                        <button className="btn btn-danger btn-sm" onClick={() => handleDelete(item)}>
-                          Delete
-                        </button>
-                      </div>
-                    </td>
+                    {isAdmin && (
+                      <td>
+                        <div className="actions">
+                          <button className="btn btn-secondary btn-sm" onClick={() => setModal({ mode: 'edit', ...item })}>
+                            Edit
+                          </button>
+                          <button className="btn btn-danger btn-sm" onClick={() => handleDelete(item)}>
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

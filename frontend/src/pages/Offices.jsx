@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
+import { useAuth } from '../auth';
 import Modal from '../components/Modal';
 import OfficeForm from '../components/OfficeForm';
 import Pagination from '../components/Pagination';
 import { getPagination } from '../utils/pagination';
 
 export default function Offices() {
+  const { isAdmin } = useAuth();
   const [offices, setOffices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -58,9 +60,11 @@ export default function Offices() {
           <h2>Offices</h2>
           <p>{offices.length} office{offices.length !== 1 ? 's' : ''} listed</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setModal({ mode: 'create' })}>
-          Add Office
-        </button>
+        {isAdmin && (
+          <button className="btn btn-primary" onClick={() => setModal({ mode: 'create' })}>
+            Add Office
+          </button>
+        )}
       </div>
 
       {error && <div className="error-banner">{error}</div>}
@@ -78,7 +82,7 @@ export default function Offices() {
                   <th>Name</th>
                   <th>Rooms</th>
                   <th>Created</th>
-                  <th>Actions</th>
+                  {isAdmin && <th>Actions</th>}
                 </tr>
               </thead>
               <tbody>
@@ -88,16 +92,18 @@ export default function Offices() {
                     <td>{office.name}</td>
                     <td>{office.room_count}</td>
                     <td>{new Date(office.created_at).toLocaleDateString()}</td>
-                    <td>
-                      <div className="actions">
-                        <button className="btn btn-secondary btn-sm" onClick={() => setModal({ mode: 'edit', ...office })}>
-                          Edit
-                        </button>
-                        <button className="btn btn-danger btn-sm" onClick={() => handleDelete(office)}>
-                          Delete
-                        </button>
-                      </div>
-                    </td>
+                    {isAdmin && (
+                      <td>
+                        <div className="actions">
+                          <button className="btn btn-secondary btn-sm" onClick={() => setModal({ mode: 'edit', ...office })}>
+                            Edit
+                          </button>
+                          <button className="btn btn-danger btn-sm" onClick={() => handleDelete(office)}>
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

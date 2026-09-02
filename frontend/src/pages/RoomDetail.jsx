@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../api/client';
+import { useAuth } from '../auth';
 import Modal from '../components/Modal';
 import HardwareForm from '../components/HardwareForm';
 import ImportanceBadge, { formatDate, formatCost } from '../components/ImportanceBadge';
+import RoomStatusBadge from '../components/RoomStatusBadge';
 
 export default function RoomDetail() {
+  const { isAdmin } = useAuth();
   const { id } = useParams();
   const [room, setRoom] = useState(null);
   const [hardware, setHardware] = useState([]);
@@ -70,17 +73,20 @@ export default function RoomDetail() {
         <div>
           <h2>{room.name}</h2>
           <p>
-            {room.office_name} &middot; {hardware.length} hardware item{hardware.length !== 1 ? 's' : ''}
+            {room.office_name} &middot; <RoomStatusBadge status={room.status} /> &middot; {hardware.length}{' '}
+            hardware item{hardware.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
-          Create Hardware for Room
-        </button>
+        {isAdmin && (
+          <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
+            Create Hardware for Room
+          </button>
+        )}
       </div>
 
       {error && <div className="error-banner">{error}</div>}
 
-      {unassigned.length > 0 && (
+      {isAdmin && unassigned.length > 0 && (
         <div className="filters" style={{ marginBottom: '1.5rem' }}>
           <label htmlFor="assign-hardware">Add existing hardware:</label>
           <select id="assign-hardware" value={assignId} onChange={(e) => setAssignId(e.target.value)}>
@@ -112,7 +118,7 @@ export default function RoomDetail() {
                   <th>EOS Date</th>
                   <th>Warranty</th>
                   <th>Est. Cost</th>
-                  <th>Actions</th>
+                  {isAdmin && <th>Actions</th>}
                 </tr>
               </thead>
               <tbody>
@@ -134,11 +140,13 @@ export default function RoomDetail() {
                     <td>{formatDate(item.end_of_support_date)}</td>
                     <td>{formatDate(item.end_of_warranty_date)}</td>
                     <td>{formatCost(item.estimated_replacement_cost)}</td>
-                    <td>
-                      <button className="btn btn-secondary btn-sm" onClick={() => handleUnassign(item)}>
-                        Remove
-                      </button>
-                    </td>
+                    {isAdmin && (
+                      <td>
+                        <button className="btn btn-secondary btn-sm" onClick={() => handleUnassign(item)}>
+                          Remove
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
