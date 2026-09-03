@@ -1,6 +1,10 @@
 node_modules/
 backend/data/
 .env
+.env.local
 backend/.env
+.railway
 dist/
 *.db
+.neon
+.env.local

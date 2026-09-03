@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { formatMacAddress, normalizeMacAddress } from '../utils/macAddress';
 
 const IMPORTANCE_LEVELS = ['low', 'medium', 'high', 'critical'];
 
@@ -29,7 +30,7 @@ export default function HardwareForm({ initial, rooms = [], onSubmit }) {
           model: initial.model || '',
           description: initial.description || '',
           estimatedReplacementCost: initial.estimated_replacement_cost ?? '',
-          macAddress: initial.mac_address || '',
+          macAddress: formatMacAddress(initial.mac_address || ''),
           ipAddress: initial.ip_address || '',
           serialNumber: initial.serial_number || '',
           softwareVersion: initial.software_version || '',
@@ -47,6 +48,15 @@ export default function HardwareForm({ initial, rooms = [], onSubmit }) {
 
   const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
 
+  const handleMacChange = (e) => {
+    const value = e.target.value;
+    setForm((f) => ({ ...f, macAddress: formatMacAddress(value) || value }));
+  };
+
+  const handleMacBlur = () => {
+    setForm((f) => ({ ...f, macAddress: formatMacAddress(f.macAddress) || f.macAddress }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.manufacturer.trim() || !form.model.trim()) {
@@ -60,7 +70,7 @@ export default function HardwareForm({ initial, rooms = [], onSubmit }) {
         model: form.model.trim(),
         description: form.description || null,
         estimatedReplacementCost: form.estimatedReplacementCost !== '' ? Number(form.estimatedReplacementCost) : null,
-        macAddress: form.macAddress || null,
+        macAddress: normalizeMacAddress(form.macAddress),
         ipAddress: form.ipAddress || null,
         serialNumber: form.serialNumber || null,
         softwareVersion: form.softwareVersion || null,
@@ -109,7 +119,12 @@ export default function HardwareForm({ initial, rooms = [], onSubmit }) {
         </div>
         <div className="form-field">
           <label>MAC Address</label>
-          <input value={form.macAddress} onChange={set('macAddress')} placeholder="00:1A:2B:3C:4D:5E" />
+          <input
+            value={form.macAddress}
+            onChange={handleMacChange}
+            onBlur={handleMacBlur}
+            placeholder="00:1a:2b:3c:4d:5e"
+          />
         </div>
         <div className="form-field">
           <label>IP Address</label>

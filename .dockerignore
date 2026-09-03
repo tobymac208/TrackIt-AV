@@ -1,0 +1,11 @@
+.git
+.cursor
+**/node_modules
+**/data
+**/.env
+backend/.env
+backend/data
+frontend/dist
+*.db
+*.md
+agent-transcripts

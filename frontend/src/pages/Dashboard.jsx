@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
+import { useAuth } from '../auth';
 import ImportanceBadge, { formatDate, formatCost, isEosSoon, isEosPast, isWarrantyPast } from '../components/ImportanceBadge';
 import Pagination from '../components/Pagination';
 import { getPagination } from '../utils/pagination';
@@ -11,6 +12,7 @@ import {
 } from '../utils/replacementReview';
 
 export default function Dashboard() {
+  const { isAdmin } = useAuth();
   const [hardware, setHardware] = useState([]);
   const [offices, setOffices] = useState([]);
   const [rooms, setRooms] = useState([]);
@@ -19,6 +21,8 @@ export default function Dashboard() {
   const [showAllAnnual, setShowAllAnnual] = useState(false);
   const [reviewPage, setReviewPage] = useState(1);
   const [eosAlertsPage, setEosAlertsPage] = useState(1);
+  const [reviewOpen, setReviewOpen] = useState(true);
+  const [eosOpen, setEosOpen] = useState(true);
 
   useEffect(() => {
     Promise.all([api.getHardware(), api.getOffices(), api.getRooms()])
@@ -73,11 +77,13 @@ export default function Dashboard() {
           <h2>Dashboard</h2>
           <p>Overview of your AV hardware inventory</p>
         </div>
-        <div className="actions">
-          <Link to="/hardware" className="btn btn-primary">
-            Add Hardware
-          </Link>
-        </div>
+        {isAdmin && (
+          <div className="actions">
+            <Link to="/hardware" className="btn btn-primary">
+              Add Hardware
+            </Link>
+          </div>
+        )}
       </div>
 
       <div className="card-grid">
@@ -99,26 +105,39 @@ export default function Dashboard() {
         </div>
         <div className="stat-card">
           <div className="label">EOS Within 90 Days</div>
-          <div className="value" style={{ color: eosSoon.length ? '#ca8a04' : undefined }}>
+          <div className="value" style={{ color: eosSoon.length ? 'var(--medium)' : undefined }}>
             {eosSoon.length}
           </div>
         </div>
         <div className="stat-card">
           <div className="label">Past EOS</div>
-          <div className="value" style={{ color: eosPast.length ? '#dc2626' : undefined }}>
+          <div className="value" style={{ color: eosPast.length ? 'var(--danger)' : undefined }}>
             {eosPast.length}
           </div>
         </div>
         <div className="stat-card">
           <div className="label">Warranty Expired</div>
-          <div className="value" style={{ color: warrantyExpired.length ? '#dc2626' : undefined }}>
+          <div className="value" style={{ color: warrantyExpired.length ? 'var(--danger)' : undefined }}>
             {warrantyExpired.length}
           </div>
         </div>
       </div>
 
       <div className="panel replacement-review-panel">
-        <div className="panel-header">Annual Replacement Review</div>
+        <button
+          type="button"
+          className="panel-header panel-header-toggle"
+          aria-expanded={reviewOpen}
+          onClick={() => setReviewOpen((open) => !open)}
+        >
+          <span>Annual Replacement Review</span>
+          <span className="panel-header-meta">
+            {displayItems.length} {displayItems.length === 1 ? 'device' : 'devices'}
+            <span className="collapse-chevron" aria-hidden="true">
+              ▾
+            </span>
+          </span>
+        </button>
         <div className="replacement-review-intro">
           <p>
             Presentation view for <strong>Critical</strong> and <strong>High</strong> importance hardware.
@@ -171,70 +190,74 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="filters" style={{ padding: '0 1.25rem 1rem' }}>
-          <label>
-            <input
-              type="checkbox"
-              checked={showAllAnnual}
-              onChange={(e) => setShowAllAnnual(e.target.checked)}
-            />{' '}
-            Show all Critical &amp; High hardware (full annual inventory)
-          </label>
-        </div>
+        {reviewOpen && (
+          <>
+            <div className="filters" style={{ padding: '0 1.25rem 1rem' }}>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={showAllAnnual}
+                  onChange={(e) => setShowAllAnnual(e.target.checked)}
+                />{' '}
+                Show all Critical &amp; High hardware (full annual inventory)
+              </label>
+            </div>
 
-        {displayItems.length === 0 ? (
-          <div className="empty-state">
-            No {showAllAnnual ? 'Critical or High' : 'priority replacement'} hardware found.
-          </div>
-        ) : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th className="col-num">#</th>
-                  <th>Device</th>
-                  <th>Location</th>
-                  <th>Importance</th>
-                  <th>Status</th>
-                  <th>EOS Date</th>
-                  <th>Warranty</th>
-                  <th>Recommendation</th>
-                  <th>Est. Cost</th>
-                  <th>Lead Time</th>
-                </tr>
-              </thead>
-              <tbody>
-                {reviewPaginatedItems.map((item, index) => (
-                  <tr key={item.id} className={item.replacementStatus.rowClass}>
-                    <td className="col-num">{reviewStartIndex + index + 1}</td>
-                    <td>
-                      <strong>
-                        {item.manufacturer} {item.model}
-                      </strong>
-                    </td>
-                    <td>{item.room_name ? `${item.office_name} — ${item.room_name}` : 'Unassigned'}</td>
-                    <td>
-                      <ImportanceBadge level={item.importance_level} />
-                    </td>
-                    <td>{item.replacementStatus.label}</td>
-                    <td>{formatDate(item.end_of_support_date)}</td>
-                    <td>{formatDate(item.end_of_warranty_date)}</td>
-                    <td style={{ maxWidth: '280px' }}>{item.recommendation}</td>
-                    <td>{formatCost(item.estimated_replacement_cost)}</td>
-                    <td>{REPLACEMENT_LEAD_TIME}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-        {displayItems.length > 0 && (
-          <Pagination
-            page={reviewSafePage}
-            totalPages={reviewTotalPages}
-            totalItems={displayItems.length}
-            onPageChange={setReviewPage}
-          />
+            {displayItems.length === 0 ? (
+              <div className="empty-state">
+                No {showAllAnnual ? 'Critical or High' : 'priority replacement'} hardware found.
+              </div>
+            ) : (
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th className="col-num">#</th>
+                      <th>Device</th>
+                      <th>Location</th>
+                      <th>Importance</th>
+                      <th>Status</th>
+                      <th>EOS Date</th>
+                      <th>Warranty</th>
+                      <th>Recommendation</th>
+                      <th>Est. Cost</th>
+                      <th>Lead Time</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reviewPaginatedItems.map((item, index) => (
+                      <tr key={item.id} className={item.replacementStatus.rowClass}>
+                        <td className="col-num">{reviewStartIndex + index + 1}</td>
+                        <td>
+                          <strong>
+                            {item.manufacturer} {item.model}
+                          </strong>
+                        </td>
+                        <td>{item.room_name ? `${item.office_name} — ${item.room_name}` : 'Unassigned'}</td>
+                        <td>
+                          <ImportanceBadge level={item.importance_level} />
+                        </td>
+                        <td>{item.replacementStatus.label}</td>
+                        <td>{formatDate(item.end_of_support_date)}</td>
+                        <td>{formatDate(item.end_of_warranty_date)}</td>
+                        <td style={{ maxWidth: '280px' }}>{item.recommendation}</td>
+                        <td>{formatCost(item.estimated_replacement_cost)}</td>
+                        <td>{REPLACEMENT_LEAD_TIME}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {displayItems.length > 0 && (
+              <Pagination
+                page={reviewSafePage}
+                totalPages={reviewTotalPages}
+                totalItems={displayItems.length}
+                onPageChange={setReviewPage}
+              />
+            )}
+          </>
         )}
       </div>
 
@@ -250,44 +273,61 @@ export default function Dashboard() {
       </div>
 
       {(eosSoon.length > 0 || eosPast.length > 0) && (
-        <div className="panel">
-          <div className="panel-header">End of Support Alerts (All Hardware)</div>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Device</th>
-                  <th>Location</th>
-                  <th>Importance</th>
-                  <th>EOS Date</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {eosPaginatedItems.map((item) => (
-                  <tr key={item.id} className={isEosPast(item.end_of_support_date) ? 'eos-past' : 'eos-soon'}>
-                    <td>
-                      {item.manufacturer} {item.model}
-                    </td>
-                    <td>
-                      {item.room_name ? `${item.office_name} — ${item.room_name}` : 'Unassigned'}
-                    </td>
-                    <td>
-                      <ImportanceBadge level={item.importance_level} />
-                    </td>
-                    <td>{formatDate(item.end_of_support_date)}</td>
-                    <td>{isEosPast(item.end_of_support_date) ? 'Past due' : 'Within 90 days'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <Pagination
-            page={eosSafePage}
-            totalPages={eosTotalPages}
-            totalItems={eosAlerts.length}
-            onPageChange={setEosAlertsPage}
-          />
+        <div className={`panel${eosOpen ? '' : ' panel-collapsed'}`}>
+          <button
+            type="button"
+            className="panel-header panel-header-toggle"
+            aria-expanded={eosOpen}
+            onClick={() => setEosOpen((open) => !open)}
+          >
+            <span>End of Support Alerts (All Hardware)</span>
+            <span className="panel-header-meta">
+              {eosAlerts.length} {eosAlerts.length === 1 ? 'alert' : 'alerts'}
+              <span className="collapse-chevron" aria-hidden="true">
+                ▾
+              </span>
+            </span>
+          </button>
+          {eosOpen && (
+            <>
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Device</th>
+                      <th>Location</th>
+                      <th>Importance</th>
+                      <th>EOS Date</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {eosPaginatedItems.map((item) => (
+                      <tr key={item.id} className={isEosPast(item.end_of_support_date) ? 'eos-past' : 'eos-soon'}>
+                        <td>
+                          {item.manufacturer} {item.model}
+                        </td>
+                        <td>
+                          {item.room_name ? `${item.office_name} — ${item.room_name}` : 'Unassigned'}
+                        </td>
+                        <td>
+                          <ImportanceBadge level={item.importance_level} />
+                        </td>
+                        <td>{formatDate(item.end_of_support_date)}</td>
+                        <td>{isEosPast(item.end_of_support_date) ? 'Past due' : 'Within 90 days'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <Pagination
+                page={eosSafePage}
+                totalPages={eosTotalPages}
+                totalItems={eosAlerts.length}
+                onPageChange={setEosAlertsPage}
+              />
+            </>
+          )}
         </div>
       )}
     </div>

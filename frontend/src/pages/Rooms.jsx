@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
+import { useAuth } from '../auth';
 import Modal from '../components/Modal';
 import RoomForm from '../components/RoomForm';
+import RoomStatusBadge from '../components/RoomStatusBadge';
 import Pagination from '../components/Pagination';
 import { getPagination } from '../utils/pagination';
 
 export default function Rooms() {
+  const { isAdmin } = useAuth();
   const navigate = useNavigate();
   const [rooms, setRooms] = useState([]);
   const [offices, setOffices] = useState([]);
@@ -64,13 +67,15 @@ export default function Rooms() {
           <h2>Conference Rooms</h2>
           <p>{rooms.length} room{rooms.length !== 1 ? 's' : ''} listed</p>
         </div>
-        <button
-          className="btn btn-primary"
-          onClick={() => setModal({ mode: 'create' })}
-          disabled={offices.length === 0}
-        >
-          Add Room
-        </button>
+        {isAdmin && (
+          <button
+            className="btn btn-primary"
+            onClick={() => setModal({ mode: 'create' })}
+            disabled={offices.length === 0}
+          >
+            Add Room
+          </button>
+        )}
       </div>
 
       <div className="filters">
@@ -85,7 +90,7 @@ export default function Rooms() {
         </select>
       </div>
 
-      {offices.length === 0 && !loading && (
+      {isAdmin && offices.length === 0 && !loading && (
         <div className="error-banner">Create an office before adding conference rooms.</div>
       )}
 
@@ -103,8 +108,9 @@ export default function Rooms() {
                   <th className="col-num">#</th>
                   <th>Room Name</th>
                   <th>Office</th>
+                  <th>Status</th>
                   <th>Hardware</th>
-                  <th>Actions</th>
+                  {isAdmin && <th>Actions</th>}
                 </tr>
               </thead>
               <tbody>
@@ -113,17 +119,22 @@ export default function Rooms() {
                     <td className="col-num">{startIndex + index + 1}</td>
                     <td>{room.name}</td>
                     <td>{room.office_name}</td>
-                    <td>{room.hardware_count}</td>
-                    <td onClick={(e) => e.stopPropagation()}>
-                      <div className="actions">
-                        <button className="btn btn-secondary btn-sm" onClick={() => setModal({ mode: 'edit', ...room })}>
-                          Edit
-                        </button>
-                        <button className="btn btn-danger btn-sm" onClick={() => handleDelete(room)}>
-                          Delete
-                        </button>
-                      </div>
+                    <td>
+                      <RoomStatusBadge status={room.status} />
                     </td>
+                    <td>{room.hardware_count}</td>
+                    {isAdmin && (
+                      <td onClick={(e) => e.stopPropagation()}>
+                        <div className="actions">
+                          <button className="btn btn-secondary btn-sm" onClick={() => setModal({ mode: 'edit', ...room })}>
+                            Edit
+                          </button>
+                          <button className="btn btn-danger btn-sm" onClick={() => handleDelete(room)}>
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
