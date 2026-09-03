@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../db');
 const asyncHandler = require('../asyncHandler');
+const { mapHardwareRow } = require('../hardwareMap');
 
 const router = express.Router();
 
@@ -69,7 +70,7 @@ router.get(
       )
       .all(req.params.id);
 
-    res.json(hardware.map((item) => ({ ...item, password: null })));
+    res.json(hardware.map((item) => mapHardwareRow(item)));
   })
 );
 

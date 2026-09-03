@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const express = require('express');
 const cors = require('cors');
+const rateLimit = require('express-rate-limit');
 
 const db = require('./db');
 const { seedUsers, requireAuth, requireWriteAdmin } = require('./auth');
@@ -18,8 +19,39 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 const frontendDist = process.env.FRONTEND_DIST || path.resolve(__dirname, '../../frontend/dist');
 
-app.use(cors());
+app.set('trust proxy', 1);
+
+const corsAllowlist = new Set(
+  [
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    'http://localhost:3001',
+    'https://avtracker-production.up.railway.app',
+    ...(process.env.CORS_ORIGIN || '').split(','),
+  ]
+    .map((origin) => origin.trim())
+    .filter(Boolean)
+);
+
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin || corsAllowlist.has(origin)) {
+        return callback(null, true);
+      }
+      return callback(null, false);
+    },
+  })
+);
 app.use(express.json({ limit: '10mb' }));
+
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many sign-in attempts. Try again later.' },
+});
 
 app.get('/api/health', async (_req, res) => {
   try {
@@ -31,6 +63,7 @@ app.get('/api/health', async (_req, res) => {
   }
 });
 
+app.use('/api/auth/login', loginLimiter);
 app.use('/api/auth', authRouter);
 app.use('/api', requireAuth);
 app.use('/api', requireWriteAdmin);
@@ -53,8 +86,8 @@ app.use((err, _req, res, _next) => {
 
 async function start() {
   await db.init();
-  if (!process.env.AUTH_SECRET || process.env.AUTH_SECRET.length < 16) {
-    throw new Error('AUTH_SECRET must be set to a string of at least 16 characters');
+  if (!process.env.AUTH_SECRET || process.env.AUTH_SECRET.length < 32) {
+    throw new Error('AUTH_SECRET must be set to a string of at least 32 characters');
   }
   await seedUsers();
   app.listen(PORT, '0.0.0.0', () => {

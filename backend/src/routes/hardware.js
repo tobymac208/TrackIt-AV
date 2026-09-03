@@ -1,7 +1,8 @@
 const express = require('express');
 const db = require('../db');
 const asyncHandler = require('../asyncHandler');
-const { encrypt, decrypt } = require('../crypto');
+const { encrypt } = require('../crypto');
+const { mapHardwareRow } = require('../hardwareMap');
 const { parseCsv } = require('../csvParser');
 const { normalizeMacAddress } = require('../macAddress');
 const { loadRoomIndex, loadOffices, resolveConferenceRoomLocation } = require('../roomMatcher');
@@ -17,16 +18,6 @@ const insertHardwareStmt = db.prepare(`
     importance_level, end_of_support_date, end_of_warranty_date, upgrade_recommendations
   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `);
-
-function mapHardwareRow(row, includePassword = false) {
-  if (!row) return null;
-  const { password_encrypted, ...rest } = row;
-  return {
-    ...rest,
-    password: includePassword && password_encrypted ? decrypt(password_encrypted) : null,
-    has_password: Boolean(password_encrypted),
-  };
-}
 
 function buildHardwareQuery(whereClause = '') {
   return `

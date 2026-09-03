@@ -6,8 +6,8 @@ const TOKEN_EXPIRES = '7d';
 
 function getSecret() {
   const secret = process.env.AUTH_SECRET;
-  if (!secret || secret.length < 16) {
-    throw new Error('AUTH_SECRET must be set to a string of at least 16 characters');
+  if (!secret || secret.length < 32) {
+    throw new Error('AUTH_SECRET must be set to a string of at least 32 characters');
   }
   return secret;
 }
