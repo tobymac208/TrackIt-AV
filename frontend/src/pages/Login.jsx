@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../auth';
 
 export default function Login() {
@@ -87,6 +88,9 @@ export default function Login() {
   return (
     <div className="login-page">
       <form className="login-card" onSubmit={handlePasswordSubmit}>
+        <Link to="/" className="login-home-link">
+          Back to home
+        </Link>
         <div className="login-brand">
           <h1>AV Tracker</h1>
           <p>Sign in to view hardware inventory</p>

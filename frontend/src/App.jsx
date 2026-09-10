@@ -1,6 +1,7 @@
 import { Navigate, Routes, Route } from 'react-router-dom';
 import { useAuth } from './auth';
 import Layout from './components/Layout';
+import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Offices from './pages/Offices';
@@ -18,7 +19,12 @@ export default function App() {
   }
 
   if (!user) {
-    return <Login />;
+    return (
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="*" element={<Landing />} />
+      </Routes>
+    );
   }
 
   return (
@@ -31,6 +37,7 @@ export default function App() {
         <Route path="/hardware" element={<Hardware />} />
         <Route path="/inventory" element={isAdmin ? <Inventory /> : <Navigate to="/" replace />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/login" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>
   );
