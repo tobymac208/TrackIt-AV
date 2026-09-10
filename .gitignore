@@ -8,3 +8,12 @@ dist/
 *.db
 .neon
 .env.local
+
+# Local Neon / Cloud Build leftovers
+/.gcloudignore
+/cloudbuild.yaml
+/neon.ts
+/package.json
+/package-lock.json
+backend/.agents/
+backend/skills-lock.json
