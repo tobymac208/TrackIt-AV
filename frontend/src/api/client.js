@@ -1,5 +1,6 @@
 const BASE = '/api';
 export const TOKEN_KEY = 'avtracker-token';
+export const AUTH_EXPIRED_EVENT = 'avtracker-auth-expired';
 
 async function request(path, options = {}) {
   const token = localStorage.getItem(TOKEN_KEY);
@@ -20,6 +21,7 @@ async function request(path, options = {}) {
   if (!response.ok) {
     if (response.status === 401 && !options.skipAuthRedirect) {
       localStorage.removeItem(TOKEN_KEY);
+      window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
     }
     throw new Error(data.error || `Request failed (${response.status})`);
   }
@@ -33,7 +35,17 @@ export const api = {
       body: JSON.stringify({ username, password }),
       skipAuthRedirect: true,
     }),
+  loginTotp: (challengeToken, code) =>
+    request('/auth/login/totp', {
+      method: 'POST',
+      body: JSON.stringify({ challengeToken, code }),
+      skipAuthRedirect: true,
+    }),
   me: () => request('/auth/me', { skipAuthRedirect: true }),
+  getTotpStatus: () => request('/auth/totp/status'),
+  setupTotp: () => request('/auth/totp/setup', { method: 'POST' }),
+  enableTotp: (code) => request('/auth/totp/enable', { method: 'POST', body: JSON.stringify({ code }) }),
+  disableTotp: (code) => request('/auth/totp/disable', { method: 'POST', body: JSON.stringify({ code }) }),
 
   getOffices: () => request('/offices'),
   getOffice: (id) => request(`/offices/${id}`),
@@ -65,5 +77,20 @@ export const api = {
   deleteHardwareBulk: (ids) => Promise.all(ids.map((id) => request(`/hardware/${id}`, { method: 'DELETE' }))),
   bulkUpdateHardware: (ids, updates) =>
     request('/hardware/bulk-update', { method: 'PATCH', body: JSON.stringify({ ids, updates }) }),
-  importHardware: (csv) => request('/hardware/import', { method: 'POST', body: JSON.stringify({ csv }) }),
+  importHardware: (csv, location = {}) =>
+    request('/hardware/import', {
+      method: 'POST',
+      body: JSON.stringify({
+        csv,
+        officeId: location.officeId || undefined,
+        conferenceRoomId: location.conferenceRoomId || undefined,
+      }),
+    }),
+
+  getInventory: () => request('/inventory'),
+  createInventory: (body) => request('/inventory', { method: 'POST', body: JSON.stringify(body) }),
+  updateInventory: (id, body) => request(`/inventory/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  updateInventoryQuantity: (id, quantity) =>
+    request(`/inventory/${id}`, { method: 'PATCH', body: JSON.stringify({ quantity }) }),
+  deleteInventory: (id) => request(`/inventory/${id}`, { method: 'DELETE' }),
 };

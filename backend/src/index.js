@@ -8,12 +8,13 @@ const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 
 const db = require('./db');
-const { seedUsers, requireAuth, requireWriteAdmin } = require('./auth');
+const { seedUsers, requireAuth, requireAdmin, requireWriteAdmin } = require('./auth');
 
 const authRouter = require('./routes/auth');
 const officesRouter = require('./routes/offices');
 const roomsRouter = require('./routes/rooms');
 const hardwareRouter = require('./routes/hardware');
+const inventoryRouter = require('./routes/inventory');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -71,6 +72,7 @@ app.use('/api', requireWriteAdmin);
 app.use('/api/offices', officesRouter);
 app.use('/api/rooms', roomsRouter);
 app.use('/api/hardware', hardwareRouter);
+app.use('/api/inventory', requireAdmin, inventoryRouter);
 
 if (fs.existsSync(frontendDist)) {
   app.use(express.static(frontendDist));

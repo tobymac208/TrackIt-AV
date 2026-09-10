@@ -6,6 +6,7 @@ const navItems = [
   { to: '/offices', label: 'Offices' },
   { to: '/rooms', label: 'Rooms' },
   { to: '/hardware', label: 'Hardware' },
+  { to: '/inventory', label: 'Inventory', adminOnly: true },
 ];
 
 export default function Layout({ children }) {
@@ -19,11 +20,13 @@ export default function Layout({ children }) {
           <p>Hardware Lifecycle</p>
         </div>
         <nav className="sidebar-nav">
-          {navItems.map(({ to, label, end }) => (
-            <NavLink key={to} to={to} end={end} className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>
-              {label}
-            </NavLink>
-          ))}
+          {navItems
+            .filter((item) => !item.adminOnly || isAdmin)
+            .map(({ to, label, end }) => (
+              <NavLink key={to} to={to} end={end} className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>
+                {label}
+              </NavLink>
+            ))}
         </nav>
         <nav className="sidebar-nav sidebar-nav-footer">
           <div className="sidebar-user">

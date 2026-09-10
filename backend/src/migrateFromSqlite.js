@@ -65,14 +65,16 @@ async function main() {
   const offices = sqlite.prepare('SELECT * FROM offices').all();
   const rooms = sqlite.prepare('SELECT * FROM conference_rooms').all();
   const hardware = sqlite.prepare('SELECT * FROM hardware').all();
+  const users = sqlite.prepare('SELECT * FROM users').all();
+  const stock = sqlite.prepare('SELECT * FROM shelf_stock').all();
 
   console.log(
-    `Copying ${offices.length} offices, ${rooms.length} rooms, ${hardware.length} hardware from ${sqlitePath}`
+    `Copying ${offices.length} offices, ${rooms.length} rooms, ${hardware.length} hardware, ${users.length} users, ${stock.length} shelf stock from ${sqlitePath}`
   );
 
   try {
     await client.query('BEGIN');
-    await client.query('TRUNCATE hardware, conference_rooms, offices RESTART IDENTITY CASCADE');
+    await client.query('TRUNCATE hardware, conference_rooms, offices, users, shelf_stock RESTART IDENTITY CASCADE');
 
     for (const row of offices) {
       await client.query('INSERT INTO offices (id, name, created_at) VALUES ($1, $2, $3)', [
@@ -84,8 +86,8 @@ async function main() {
 
     for (const row of rooms) {
       await client.query(
-        'INSERT INTO conference_rooms (id, office_id, name, status, created_at) VALUES ($1, $2, $3, $4, $5)',
-        [row.id, row.office_id, row.name, row.status || 'functional', row.created_at]
+        'INSERT INTO conference_rooms (id, office_id, name, status, issue_description, created_at) VALUES ($1, $2, $3, $4, $5, $6)',
+        [row.id, row.office_id, row.name, row.status || 'functional', row.issue_description || null, row.created_at]
       );
     }
 
@@ -120,9 +122,44 @@ async function main() {
       );
     }
 
+    for (const row of users) {
+      await client.query(
+        `INSERT INTO users (id, username, password_hash, role, totp_secret, totp_enabled, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          row.id,
+          row.username,
+          row.password_hash,
+          row.role,
+          row.totp_secret || null,
+          row.totp_enabled ? 1 : 0,
+          row.created_at,
+        ]
+      );
+    }
+
+    for (const row of stock) {
+      await client.query(
+        `INSERT INTO shelf_stock (id, manufacturer, model, quantity, location, notes, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [
+          row.id,
+          row.manufacturer,
+          row.model,
+          row.quantity,
+          row.location || null,
+          row.notes || null,
+          row.created_at,
+          row.updated_at,
+        ]
+      );
+    }
+
     await resetSequence(client, 'offices');
     await resetSequence(client, 'conference_rooms');
     await resetSequence(client, 'hardware');
+    await resetSequence(client, 'users');
+    await resetSequence(client, 'shelf_stock');
     await client.query('COMMIT');
     console.log('Migration complete.');
   } catch (err) {

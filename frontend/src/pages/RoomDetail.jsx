@@ -86,6 +86,13 @@ export default function RoomDetail() {
 
       {error && <div className="error-banner">{error}</div>}
 
+      {room.status === 'issue' && room.issue_description && (
+        <div className="room-issue-note">
+          <strong>Issue</strong>
+          <p>{room.issue_description}</p>
+        </div>
+      )}
+
       {isAdmin && unassigned.length > 0 && (
         <div className="filters" style={{ marginBottom: '1.5rem' }}>
           <label htmlFor="assign-hardware">Add existing hardware:</label>

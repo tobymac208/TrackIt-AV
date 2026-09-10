@@ -1,11 +1,29 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { api, TOKEN_KEY } from './api/client';
+import { api, AUTH_EXPIRED_EVENT, TOKEN_KEY } from './api/client';
 
 const AuthContext = createContext(null);
+
+function getTokenExpiresAt(token) {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    return typeof payload.exp === 'number' ? payload.exp * 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearStoredToken() {
+  localStorage.removeItem(TOKEN_KEY);
+}
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [ready, setReady] = useState(false);
+
+  const endSession = () => {
+    clearStoredToken();
+    setUser(null);
+  };
 
   useEffect(() => {
     const token = localStorage.getItem(TOKEN_KEY);
@@ -14,14 +32,44 @@ export function AuthProvider({ children }) {
       return;
     }
 
+    const expiresAt = getTokenExpiresAt(token);
+    if (!expiresAt || expiresAt <= Date.now()) {
+      clearStoredToken();
+      setReady(true);
+      return;
+    }
+
     api
       .me()
       .then(setUser)
       .catch(() => {
-        localStorage.removeItem(TOKEN_KEY);
+        clearStoredToken();
         setUser(null);
       })
       .finally(() => setReady(true));
+  }, []);
+
+  useEffect(() => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token || !user) return undefined;
+
+    const expiresAt = getTokenExpiresAt(token);
+    if (!expiresAt || expiresAt <= Date.now()) {
+      endSession();
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(endSession, expiresAt - Date.now());
+    return () => window.clearTimeout(timeoutId);
+  }, [user]);
+
+  useEffect(() => {
+    const onExpired = () => {
+      clearStoredToken();
+      setUser(null);
+    };
+    window.addEventListener(AUTH_EXPIRED_EVENT, onExpired);
+    return () => window.removeEventListener(AUTH_EXPIRED_EVENT, onExpired);
   }, []);
 
   const value = useMemo(
@@ -31,12 +79,21 @@ export function AuthProvider({ children }) {
       isAdmin: user?.role === 'admin',
       async login(username, password) {
         const result = await api.login(username, password);
+        if (result.requiresTotp) {
+          return result;
+        }
         localStorage.setItem(TOKEN_KEY, result.token);
         setUser(result.user);
+        return result;
+      },
+      async completeTotpLogin(challengeToken, code) {
+        const result = await api.loginTotp(challengeToken, code);
+        localStorage.setItem(TOKEN_KEY, result.token);
+        setUser(result.user);
+        return result;
       },
       logout() {
-        localStorage.removeItem(TOKEN_KEY);
-        setUser(null);
+        endSession();
       },
     }),
     [user, ready]

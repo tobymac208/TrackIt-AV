@@ -6,6 +6,11 @@ const HEADER_ALIASES = {
   manufacturer: 'manufacturer',
   model: 'model',
   description: 'description',
+  notes: 'description',
+  name: 'product',
+  name_or_description: 'product',
+  device_name: 'product',
+  device: 'product',
   estimated_replacement_cost: 'estimatedReplacementCost',
   estimated_cost: 'estimatedReplacementCost',
   est_replacement_cost: 'estimatedReplacementCost',
@@ -96,6 +101,11 @@ function normalizeImportRow(row) {
     const { manufacturer, model } = splitProduct(normalized.product);
     if (!normalized.manufacturer) normalized.manufacturer = manufacturer;
     if (!normalized.model) normalized.model = model;
+    if (!normalized.description) normalized.description = normalized.product;
+  }
+
+  if (!normalized.model && normalized.manufacturer) {
+    normalized.model = normalized.manufacturer;
   }
 
   if (normalized.lifecycle) {
@@ -181,12 +191,13 @@ function parseCsv(text) {
   const rawHeaders = parseCsvLine(lines[0], delimiter);
   const fieldMap = rawHeaders.map((h) => mapHeader(h));
 
-  const hasManufacturerModel = fieldMap.includes('manufacturer') && fieldMap.includes('model');
+  const hasManufacturer = fieldMap.includes('manufacturer');
+  const hasModel = fieldMap.includes('model');
   const hasProduct = fieldMap.includes('product');
-  if (!hasManufacturerModel && !hasProduct) {
+  if (!hasManufacturer && !hasProduct && !hasModel) {
     const found = rawHeaders.filter(Boolean).slice(0, 6).join(', ') || '(none)';
     throw new Error(
-      `CSV must include manufacturer and model columns, or a product column. Found headers: ${found}`
+      `CSV must include a manufacturer, model, or product column. Found headers: ${found}`
     );
   }
 
@@ -200,8 +211,9 @@ function parseCsv(text) {
 
     const row = { _line: i + 1 };
     fieldMap.forEach((field, index) => {
-      if (field && values[index] !== undefined && values[index] !== '') {
-        row[field] = values[index];
+      const value = values[index];
+      if (field && value && value.toLowerCase() !== 'null') {
+        row[field] = value;
       }
     });
     rows.push(normalizeImportRow(row));

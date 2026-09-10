@@ -92,7 +92,33 @@ async function insertHardwareRecord(data) {
   return await db.prepare(buildHardwareQuery('WHERE h.id = ?')).get(result.lastInsertRowid);
 }
 
-function validateImportRow(row, offices, roomIndex) {
+function resolveImportLocation(row, offices, roomIndex, defaults) {
+  const hasCsvLocation = Boolean(
+    (row.office && row.office.trim()) ||
+      (row.room && row.room.trim()) ||
+      row.belongsToParsed
+  );
+
+  if (hasCsvLocation) {
+    return resolveConferenceRoomLocation(
+      {
+        office: row.office || defaults.officeName || null,
+        room: row.room,
+        belongsToParsed: row.belongsToParsed,
+      },
+      offices,
+      roomIndex
+    );
+  }
+
+  if (defaults.conferenceRoomId) {
+    return { conferenceRoomId: defaults.conferenceRoomId, warnings: [] };
+  }
+
+  return { conferenceRoomId: null, warnings: [] };
+}
+
+function validateImportRow(row, offices, roomIndex, defaults = {}) {
   const errors = [];
   if (!row.manufacturer || !row.manufacturer.trim()) errors.push('Manufacturer is required');
   if (!row.model || !row.model.trim()) errors.push('Model is required');
@@ -117,11 +143,7 @@ function validateImportRow(row, offices, roomIndex) {
     errors.push('End of warranty date must be YYYY-MM-DD or a valid date');
   }
 
-  const roomResult = resolveConferenceRoomLocation(
-    { office: row.office, room: row.room, belongsToParsed: row.belongsToParsed },
-    offices,
-    roomIndex
-  );
+  const roomResult = resolveImportLocation(row, offices, roomIndex, defaults);
   const warnings = [...(roomResult.warnings || [])];
 
   return {
@@ -152,7 +174,7 @@ function validateImportRow(row, offices, roomIndex) {
 router.post(
   '/import',
   asyncHandler(async (req, res) => {
-    const { csv } = req.body;
+    const { csv, officeId, conferenceRoomId } = req.body;
     if (!csv || !csv.trim()) {
       return res.status(400).json({ error: 'CSV content is required' });
     }
@@ -170,13 +192,29 @@ router.post(
 
     const offices = await loadOffices(db);
     const roomIndex = await loadRoomIndex(db);
+    const defaults = { officeName: null, conferenceRoomId: null };
+
+    if (conferenceRoomId) {
+      const room = roomIndex.find((entry) => Number(entry.id) === Number(conferenceRoomId));
+      if (!room) {
+        return res.status(400).json({ error: 'Selected conference room was not found' });
+      }
+      defaults.conferenceRoomId = room.id;
+      defaults.officeName = room.office_name;
+    } else if (officeId) {
+      const office = offices.find((entry) => Number(entry.id) === Number(officeId));
+      if (!office) {
+        return res.status(400).json({ error: 'Selected office was not found' });
+      }
+      defaults.officeName = office.name;
+    }
 
     const imported = [];
     const failed = [];
     const warnings = [];
 
     for (const row of rows) {
-      const { errors, warnings: rowWarnings, data } = validateImportRow(row, offices, roomIndex);
+      const { errors, warnings: rowWarnings, data } = validateImportRow(row, offices, roomIndex, defaults);
       if (errors.length) {
         failed.push({ line: row._line, errors });
         continue;

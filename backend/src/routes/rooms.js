@@ -13,6 +13,11 @@ function normalizeRoomStatus(value) {
   return ROOM_STATUSES.includes(status) ? status : null;
 }
 
+function normalizeIssueDescription(status, value) {
+  if (status !== 'issue') return null;
+  return (value || '').trim() || null;
+}
+
 function getRoomQuery(whereClause = '') {
   return `
     SELECT cr.*,
@@ -77,7 +82,7 @@ router.get(
 router.post(
   '/',
   asyncHandler(async (req, res) => {
-    const { name, officeId, status } = req.body;
+    const { name, officeId, status, issueDescription } = req.body;
     if (!name || !name.trim()) {
       return res.status(400).json({ error: 'Name is required' });
     }
@@ -90,6 +95,11 @@ router.post(
       return res.status(400).json({ error: 'Status must be functional or issue' });
     }
 
+    const issueText = normalizeIssueDescription(roomStatus || 'functional', issueDescription);
+    if ((roomStatus || 'functional') === 'issue' && !issueText) {
+      return res.status(400).json({ error: 'Issue description is required when status is Issue' });
+    }
+
     const office = await db.prepare('SELECT id FROM offices WHERE id = ?').get(officeId);
     if (!office) {
       return res.status(400).json({ error: 'Office not found' });
@@ -97,8 +107,8 @@ router.post(
 
     try {
       const result = await db
-        .prepare('INSERT INTO conference_rooms (office_id, name, status) VALUES (?, ?, ?)')
-        .run(officeId, name.trim(), roomStatus || 'functional');
+        .prepare('INSERT INTO conference_rooms (office_id, name, status, issue_description) VALUES (?, ?, ?, ?)')
+        .run(officeId, name.trim(), roomStatus || 'functional', issueText);
       const room = await db.prepare(getRoomQuery('WHERE cr.id = ?')).get(result.lastInsertRowid);
       res.status(201).json(room);
     } catch (err) {
@@ -113,7 +123,7 @@ router.post(
 router.put(
   '/:id',
   asyncHandler(async (req, res) => {
-    const { name, officeId, status } = req.body;
+    const { name, officeId, status, issueDescription } = req.body;
     if (!name || !name.trim()) {
       return res.status(400).json({ error: 'Name is required' });
     }
@@ -131,6 +141,12 @@ router.put(
       return res.status(404).json({ error: 'Conference room not found' });
     }
 
+    const nextStatus = roomStatus || existing.status || 'functional';
+    const issueText = normalizeIssueDescription(nextStatus, issueDescription);
+    if (nextStatus === 'issue' && !issueText) {
+      return res.status(400).json({ error: 'Issue description is required when status is Issue' });
+    }
+
     const office = await db.prepare('SELECT id FROM offices WHERE id = ?').get(officeId);
     if (!office) {
       return res.status(400).json({ error: 'Office not found' });
@@ -138,8 +154,8 @@ router.put(
 
     try {
       await db
-        .prepare('UPDATE conference_rooms SET name = ?, office_id = ?, status = ? WHERE id = ?')
-        .run(name.trim(), officeId, roomStatus || existing.status || 'functional', req.params.id);
+        .prepare('UPDATE conference_rooms SET name = ?, office_id = ?, status = ?, issue_description = ? WHERE id = ?')
+        .run(name.trim(), officeId, nextStatus, issueText, req.params.id);
       const room = await db.prepare(getRoomQuery('WHERE cr.id = ?')).get(req.params.id);
       res.json(room);
     } catch (err) {

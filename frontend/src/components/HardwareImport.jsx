@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../api/client';
 
 const TEMPLATE_CSV = `manufacturer,model,description,estimated_replacement_cost,mac_address,ip_address,serial_number,software_version,username,password,importance_level,end_of_support_date,end_of_warranty_date,upgrade_recommendations,office,room
@@ -7,9 +7,26 @@ Crestron,DM-NVX-363,Primary video encoder,2500.00,00:1A:2B:3C:4D:5E,192.168.1.10
 
 export default function HardwareImport({ onClose, onComplete }) {
   const fileRef = useRef(null);
+  const [offices, setOffices] = useState([]);
+  const [rooms, setRooms] = useState([]);
+  const [officeId, setOfficeId] = useState('');
+  const [conferenceRoomId, setConferenceRoomId] = useState('');
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
+
+  useEffect(() => {
+    Promise.all([api.getOffices(), api.getRooms()])
+      .then(([officeRows, roomRows]) => {
+        setOffices(officeRows);
+        setRooms(roomRows);
+      })
+      .catch((err) => setError(err.message));
+  }, []);
+
+  const roomsInOffice = officeId
+    ? rooms.filter((room) => String(room.office_id) === String(officeId))
+    : rooms;
 
   const downloadTemplate = () => {
     const blob = new Blob([TEMPLATE_CSV], { type: 'text/csv' });
@@ -19,6 +36,27 @@ export default function HardwareImport({ onClose, onComplete }) {
     a.download = 'hardware-import-template.csv';
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleOfficeChange = (value) => {
+    setOfficeId(value);
+    if (!value) {
+      setConferenceRoomId('');
+      return;
+    }
+    const selectedRoom = rooms.find((room) => String(room.id) === String(conferenceRoomId));
+    if (selectedRoom && String(selectedRoom.office_id) !== String(value)) {
+      setConferenceRoomId('');
+    }
+  };
+
+  const handleRoomChange = (value) => {
+    setConferenceRoomId(value);
+    if (!value) return;
+    const selectedRoom = rooms.find((room) => String(room.id) === String(value));
+    if (selectedRoom) {
+      setOfficeId(String(selectedRoom.office_id));
+    }
   };
 
   const handleImport = async () => {
@@ -34,7 +72,10 @@ export default function HardwareImport({ onClose, onComplete }) {
 
     try {
       const csv = await file.text();
-      const data = await api.importHardware(csv);
+      const data = await api.importHardware(csv, {
+        officeId: officeId ? Number(officeId) : undefined,
+        conferenceRoomId: conferenceRoomId ? Number(conferenceRoomId) : undefined,
+      });
       setResult(data);
       if (data.imported > 0) {
         onComplete();
@@ -52,16 +93,44 @@ export default function HardwareImport({ onClose, onComplete }) {
 
       <p style={{ marginTop: 0, color: 'var(--text-muted)', fontSize: '0.9rem' }}>
         Upload a CSV file to bulk-import hardware. Required columns: <strong>manufacturer</strong> +{' '}
-        <strong>model</strong>, or a single <strong>product</strong> column (e.g. &quot;Cisco Touch 10&quot; is
-        split automatically). Webex <strong>belongsto</strong> values like{' '}
-        <code>602-322-6177 PHX.Integrity@ryancompanies.com</code> are parsed as site code <strong>PHX</strong> + room{' '}
-        <strong>Integrity</strong> and matched to your offices and rooms automatically.
+        <strong>model</strong>, a <strong>product</strong> column, or a Meraki-style{' '}
+        <strong>manufacturer</strong> + <strong>name or description</strong> export. If the file has no
+        location, pick an office and conference room below. CSV location columns still win when present.
       </p>
 
       <div className="actions" style={{ marginBottom: '1rem' }}>
         <button type="button" className="btn btn-secondary btn-sm" onClick={downloadTemplate}>
           Download Template
         </button>
+      </div>
+
+      <div className="form-grid" style={{ marginBottom: '1rem' }}>
+        <div className="form-field">
+          <label htmlFor="import-office">Office (optional)</label>
+          <select id="import-office" value={officeId} onChange={(e) => handleOfficeChange(e.target.value)}>
+            <option value="">No default office</option>
+            {offices.map((office) => (
+              <option key={office.id} value={office.id}>
+                {office.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="form-field">
+          <label htmlFor="import-room">Conference room (optional)</label>
+          <select
+            id="import-room"
+            value={conferenceRoomId}
+            onChange={(e) => handleRoomChange(e.target.value)}
+          >
+            <option value="">Leave unassigned if CSV has no location</option>
+            {roomsInOffice.map((room) => (
+              <option key={room.id} value={room.id}>
+                {officeId ? room.name : `${room.office_name} — ${room.name}`}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <div className="form-field">

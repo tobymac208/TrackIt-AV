@@ -13,6 +13,7 @@ const SQLITE_SCHEMA = `
     office_id INTEGER NOT NULL,
     name TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'functional' CHECK (status IN ('functional', 'issue')),
+    issue_description TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (office_id) REFERENCES offices(id) ON DELETE CASCADE,
     UNIQUE (office_id, name)
@@ -45,7 +46,20 @@ const SQLITE_SCHEMA = `
     username TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
     role TEXT NOT NULL CHECK (role IN ('admin', 'user')),
+    totp_secret TEXT,
+    totp_enabled INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS shelf_stock (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    manufacturer TEXT NOT NULL,
+    model TEXT NOT NULL,
+    quantity INTEGER NOT NULL CHECK (quantity >= 0),
+    location TEXT,
+    notes TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 `;
 
@@ -61,6 +75,7 @@ const POSTGRES_SCHEMA = `
     office_id INTEGER NOT NULL REFERENCES offices(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'functional' CHECK (status IN ('functional', 'issue')),
+    issue_description TEXT,
     created_at TEXT NOT NULL DEFAULT TO_CHAR(NOW(), 'YYYY-MM-DD HH24:MI:SS'),
     UNIQUE (office_id, name)
   );
@@ -91,7 +106,20 @@ const POSTGRES_SCHEMA = `
     username TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
     role TEXT NOT NULL CHECK (role IN ('admin', 'user')),
+    totp_secret TEXT,
+    totp_enabled INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT TO_CHAR(NOW(), 'YYYY-MM-DD HH24:MI:SS')
+  );
+
+  CREATE TABLE IF NOT EXISTS shelf_stock (
+    id SERIAL PRIMARY KEY,
+    manufacturer TEXT NOT NULL,
+    model TEXT NOT NULL,
+    quantity INTEGER NOT NULL CHECK (quantity >= 0),
+    location TEXT,
+    notes TEXT,
+    created_at TEXT NOT NULL DEFAULT TO_CHAR(NOW(), 'YYYY-MM-DD HH24:MI:SS'),
+    updated_at TEXT NOT NULL DEFAULT TO_CHAR(NOW(), 'YYYY-MM-DD HH24:MI:SS')
   );
 `;
 
@@ -124,7 +152,7 @@ function normalizeRow(row) {
     } else if (
       typeof value === 'string' &&
       /^-?\d+$/.test(value) &&
-      (key === 'id' || key.endsWith('_id') || key.endsWith('_count'))
+      (key === 'id' || key === 'quantity' || key.endsWith('_id') || key.endsWith('_count'))
     ) {
       out[key] = Number(value);
     }
@@ -184,6 +212,17 @@ function createSqliteDriver() {
     db.exec(
       "ALTER TABLE conference_rooms ADD COLUMN status TEXT NOT NULL DEFAULT 'functional' CHECK (status IN ('functional', 'issue'))"
     );
+  }
+  if (!roomColumns.some((col) => col.name === 'issue_description')) {
+    db.exec('ALTER TABLE conference_rooms ADD COLUMN issue_description TEXT');
+  }
+
+  const userColumns = db.prepare('PRAGMA table_info(users)').all();
+  if (!userColumns.some((col) => col.name === 'totp_secret')) {
+    db.exec('ALTER TABLE users ADD COLUMN totp_secret TEXT');
+  }
+  if (!userColumns.some((col) => col.name === 'totp_enabled')) {
+    db.exec('ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0');
   }
 
   return {
@@ -246,6 +285,9 @@ async function initPostgresSchema(pgDriver) {
   await pgDriver.exec(
     "ALTER TABLE conference_rooms ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'functional'"
   );
+  await pgDriver.exec('ALTER TABLE conference_rooms ADD COLUMN IF NOT EXISTS issue_description TEXT');
+  await pgDriver.exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_secret TEXT');
+  await pgDriver.exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_enabled INTEGER NOT NULL DEFAULT 0');
 }
 
 async function init() {

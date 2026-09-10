@@ -1,8 +1,13 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const QRCode = require('qrcode');
+const { generateSecret, generateURI, verify } = require('otplib');
 const db = require('./db');
+const { encrypt, decrypt } = require('./crypto');
 
-const TOKEN_EXPIRES = '7d';
+const TOKEN_EXPIRES = '8h';
+const TOTP_CHALLENGE_EXPIRES = '5m';
+const TOTP_ISSUER = 'AV Tracker';
 
 function getSecret() {
   const secret = process.env.AUTH_SECRET;
@@ -13,13 +18,43 @@ function getSecret() {
 }
 
 function signToken(user) {
-  return jwt.sign({ sub: user.id, username: user.username, role: user.role }, getSecret(), {
+  return jwt.sign({ typ: 'session', sub: user.id, username: user.username, role: user.role }, getSecret(), {
     expiresIn: TOKEN_EXPIRES,
   });
 }
 
+function signTotpChallenge(user) {
+  return jwt.sign({ typ: 'totp', sub: user.id, username: user.username, role: user.role }, getSecret(), {
+    expiresIn: TOTP_CHALLENGE_EXPIRES,
+  });
+}
+
 function publicUser(user) {
-  return { id: user.id, username: user.username, role: user.role };
+  return {
+    id: user.id,
+    username: user.username,
+    role: user.role,
+    totpEnabled: Boolean(Number(user.totp_enabled)),
+  };
+}
+
+function isTotpEnabled(user) {
+  return Boolean(Number(user.totp_enabled)) && Boolean(user.totp_secret);
+}
+
+function normalizeCode(code) {
+  return String(code || '').replace(/\s+/g, '');
+}
+
+async function verifyTotpCode(secret, code) {
+  const token = normalizeCode(code);
+  if (!/^\d{6}$/.test(token)) return false;
+  const result = await verify({
+    secret,
+    token,
+    epochTolerance: 30,
+  });
+  return Boolean(result?.valid);
 }
 
 async function seedUsers() {
@@ -51,6 +86,9 @@ function requireAuth(req, res, next) {
 
   try {
     const payload = jwt.verify(token, getSecret());
+    if (payload.typ === 'totp') {
+      return res.status(401).json({ error: 'Sign in required' });
+    }
     req.user = { id: payload.sub, username: payload.username, role: payload.role };
     next();
   } catch {
@@ -75,7 +113,97 @@ async function login(username, password) {
   if (!user || !bcrypt.compareSync(password || '', user.password_hash)) {
     return null;
   }
+  if (isTotpEnabled(user)) {
+    return { requiresTotp: true, challengeToken: signTotpChallenge(user) };
+  }
   return { token: signToken(user), user: publicUser(user) };
+}
+
+async function completeTotpLogin(challengeToken, code) {
+  let payload;
+  try {
+    payload = jwt.verify(challengeToken || '', getSecret());
+  } catch {
+    return null;
+  }
+  if (payload.typ !== 'totp') return null;
+
+  const user = await db.prepare('SELECT * FROM users WHERE id = ?').get(payload.sub);
+  if (!user || !isTotpEnabled(user)) return null;
+
+  let secret;
+  try {
+    secret = decrypt(user.totp_secret);
+  } catch {
+    return null;
+  }
+  try {
+    if (!secret || !(await verifyTotpCode(secret, code))) return null;
+  } catch {
+    return null;
+  }
+
+  return { token: signToken(user), user: publicUser(user) };
+}
+
+async function getTotpStatus(userId) {
+  const user = await db.prepare('SELECT totp_enabled FROM users WHERE id = ?').get(userId);
+  return { enabled: Boolean(Number(user?.totp_enabled)) };
+}
+
+async function startTotpSetup(user) {
+  if (user.role !== 'admin') {
+    throw Object.assign(new Error('Only the admin account can enable authenticator sign-in'), { status: 403 });
+  }
+
+  const current = await db.prepare('SELECT totp_enabled FROM users WHERE id = ?').get(user.id);
+  if (Number(current?.totp_enabled)) {
+    throw Object.assign(new Error('Authenticator sign-in is already enabled'), { status: 400 });
+  }
+
+  const secret = generateSecret();
+  await db.prepare('UPDATE users SET totp_secret = ?, totp_enabled = 0 WHERE id = ?').run(encrypt(secret), user.id);
+
+  const uri = generateURI({
+    issuer: TOTP_ISSUER,
+    label: user.username,
+    secret,
+  });
+  const qrDataUrl = await QRCode.toDataURL(uri, { margin: 1, width: 220 });
+  return { qrDataUrl, secret };
+}
+
+async function enableTotp(user, code) {
+  const row = await db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
+  if (!row?.totp_secret) {
+    throw Object.assign(new Error('Start authenticator setup first'), { status: 400 });
+  }
+  if (Number(row.totp_enabled)) {
+    throw Object.assign(new Error('Authenticator sign-in is already enabled'), { status: 400 });
+  }
+
+  const secret = decrypt(row.totp_secret);
+  if (!secret || !(await verifyTotpCode(secret, code))) {
+    throw Object.assign(new Error('Invalid authenticator code'), { status: 401 });
+  }
+
+  await db.prepare('UPDATE users SET totp_enabled = 1 WHERE id = ?').run(user.id);
+  return { enabled: true };
+}
+
+async function disableTotp(user, code) {
+  const row = await db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
+  if (!isTotpEnabled(row)) {
+    throw Object.assign(new Error('Authenticator sign-in is not enabled'), { status: 400 });
+  }
+
+  const secret = decrypt(row.totp_secret);
+  if (!secret || !(await verifyTotpCode(secret, code))) {
+    throw Object.assign(new Error('Invalid authenticator code'), { status: 401 });
+  }
+
+  await db.prepare('UPDATE users SET totp_secret = NULL, totp_enabled = 0 WHERE id = ?').run(user.id);
+  return { enabled: false };
 }
 
 module.exports = {
@@ -84,5 +212,10 @@ module.exports = {
   requireAdmin,
   requireWriteAdmin,
   login,
+  completeTotpLogin,
+  getTotpStatus,
+  startTotpSetup,
+  enableTotp,
+  disableTotp,
   publicUser,
 };

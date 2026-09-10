@@ -121,6 +121,9 @@ export default function Rooms() {
                     <td>{room.office_name}</td>
                     <td>
                       <RoomStatusBadge status={room.status} />
+                      {room.status === 'issue' && room.issue_description && (
+                        <div className="room-issue-preview">{room.issue_description}</div>
+                      )}
                     </td>
                     <td>{room.hardware_count}</td>
                     {isAdmin && (
