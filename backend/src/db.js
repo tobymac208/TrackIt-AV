@@ -287,11 +287,12 @@ function createPostgresDriver(pool) {
       let query = sql;
       const isInsert = /^\s*INSERT/i.test(sql) && !/RETURNING/i.test(sql);
       if (isInsert) {
-        query = `${sql.replace(/;?\s*$/, '')} RETURNING id`;
+        query = `${sql.replace(/;?\s*$/, '')} RETURNING *`;
       }
       const result = await pool.query(toPostgresSql(query), params);
+      const row = result.rows[0];
       return {
-        lastInsertRowid: result.rows[0] ? Number(result.rows[0].id) : undefined,
+        lastInsertRowid: row && row.id != null ? Number(row.id) : undefined,
         changes: result.rowCount,
       };
     },
