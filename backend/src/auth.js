@@ -4,10 +4,12 @@ const QRCode = require('qrcode');
 const { generateSecret, generateURI, verify } = require('otplib');
 const db = require('./db');
 const { encrypt, decrypt } = require('./crypto');
+const { isLocked, recordFailure, clearFailures } = require('./loginGuard');
 
 const TOKEN_EXPIRES = '8h';
 const TOTP_CHALLENGE_EXPIRES = '5m';
 const TOTP_ISSUER = 'AV Tracker';
+const TIMING_HASH = bcrypt.hashSync('avtracker-timing-placeholder', 10);
 
 function getSecret() {
   const secret = process.env.AUTH_SECRET;
@@ -110,7 +112,8 @@ function requireWriteAdmin(req, res, next) {
 
 async function login(username, password) {
   const user = await db.prepare('SELECT * FROM users WHERE username = ?').get((username || '').trim());
-  if (!user || !bcrypt.compareSync(password || '', user.password_hash)) {
+  const passwordHash = user?.password_hash || TIMING_HASH;
+  if (!user || !bcrypt.compareSync(password || '', passwordHash)) {
     return null;
   }
   if (isTotpEnabled(user)) {
@@ -127,6 +130,9 @@ async function completeTotpLogin(challengeToken, code) {
     return null;
   }
   if (payload.typ !== 'totp') return null;
+  if (isLocked('totp', payload.sub)) {
+    return { locked: true };
+  }
 
   const user = await db.prepare('SELECT * FROM users WHERE id = ?').get(payload.sub);
   if (!user || !isTotpEnabled(user)) return null;
@@ -138,11 +144,16 @@ async function completeTotpLogin(challengeToken, code) {
     return null;
   }
   try {
-    if (!secret || !(await verifyTotpCode(secret, code))) return null;
+    if (!secret || !(await verifyTotpCode(secret, code))) {
+      recordFailure('totp', payload.sub);
+      return null;
+    }
   } catch {
+    recordFailure('totp', payload.sub);
     return null;
   }
 
+  clearFailures('totp', payload.sub);
   return { token: signToken(user), user: publicUser(user) };
 }
 

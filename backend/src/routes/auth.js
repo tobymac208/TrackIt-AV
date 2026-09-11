@@ -10,8 +10,10 @@ const {
   requireAuth,
   requireAdmin,
 } = require('../auth');
+const { isLocked, recordFailure, clearFailures } = require('../loginGuard');
 
 const router = express.Router();
+const LOCKOUT_MESSAGE = 'Too many sign-in attempts. Try again later.';
 
 function sendAuthError(res, err) {
   return res.status(err.status || 500).json({ error: err.message || 'Request failed' });
@@ -21,10 +23,15 @@ router.post(
   '/login',
   asyncHandler(async (req, res) => {
     const { username, password } = req.body || {};
+    if (isLocked('password', username)) {
+      return res.status(429).json({ error: LOCKOUT_MESSAGE });
+    }
     const result = await login(username, password);
     if (!result) {
+      recordFailure('password', username);
       return res.status(401).json({ error: 'Invalid username or password' });
     }
+    clearFailures('password', username);
     res.json(result);
   })
 );
@@ -34,6 +41,9 @@ router.post(
   asyncHandler(async (req, res) => {
     const { challengeToken, code } = req.body || {};
     const result = await completeTotpLogin(challengeToken, code);
+    if (result?.locked) {
+      return res.status(429).json({ error: LOCKOUT_MESSAGE });
+    }
     if (!result) {
       return res.status(401).json({ error: 'Invalid authenticator code' });
     }
