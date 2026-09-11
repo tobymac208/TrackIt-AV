@@ -41,6 +41,14 @@ const SQLITE_SCHEMA = `
     FOREIGN KEY (conference_room_id) REFERENCES conference_rooms(id) ON DELETE SET NULL
   );
 
+  CREATE TABLE IF NOT EXISTS hardware_rooms (
+    hardware_id INTEGER NOT NULL,
+    conference_room_id INTEGER NOT NULL,
+    PRIMARY KEY (hardware_id, conference_room_id),
+    FOREIGN KEY (hardware_id) REFERENCES hardware(id) ON DELETE CASCADE,
+    FOREIGN KEY (conference_room_id) REFERENCES conference_rooms(id) ON DELETE CASCADE
+  );
+
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT NOT NULL UNIQUE,
@@ -99,6 +107,12 @@ const POSTGRES_SCHEMA = `
     upgrade_recommendations TEXT,
     created_at TEXT NOT NULL DEFAULT TO_CHAR(NOW(), 'YYYY-MM-DD HH24:MI:SS'),
     updated_at TEXT NOT NULL DEFAULT TO_CHAR(NOW(), 'YYYY-MM-DD HH24:MI:SS')
+  );
+
+  CREATE TABLE IF NOT EXISTS hardware_rooms (
+    hardware_id INTEGER NOT NULL REFERENCES hardware(id) ON DELETE CASCADE,
+    conference_room_id INTEGER NOT NULL REFERENCES conference_rooms(id) ON DELETE CASCADE,
+    PRIMARY KEY (hardware_id, conference_room_id)
   );
 
   CREATE TABLE IF NOT EXISTS users (
@@ -225,6 +239,17 @@ function createSqliteDriver() {
     db.exec('ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0');
   }
 
+  db.exec(`
+    INSERT INTO hardware_rooms (hardware_id, conference_room_id)
+    SELECT h.id, h.conference_room_id
+    FROM hardware h
+    WHERE h.conference_room_id IS NOT NULL
+      AND NOT EXISTS (
+        SELECT 1 FROM hardware_rooms hr
+        WHERE hr.hardware_id = h.id AND hr.conference_room_id = h.conference_room_id
+      )
+  `);
+
   return {
     async all(sql, params) {
       return db.prepare(sql).all(...params).map(normalizeRow);
@@ -288,6 +313,16 @@ async function initPostgresSchema(pgDriver) {
   await pgDriver.exec('ALTER TABLE conference_rooms ADD COLUMN IF NOT EXISTS issue_description TEXT');
   await pgDriver.exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_secret TEXT');
   await pgDriver.exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_enabled INTEGER NOT NULL DEFAULT 0');
+  await pgDriver.exec(`
+    INSERT INTO hardware_rooms (hardware_id, conference_room_id)
+    SELECT h.id, h.conference_room_id
+    FROM hardware h
+    WHERE h.conference_room_id IS NOT NULL
+      AND NOT EXISTS (
+        SELECT 1 FROM hardware_rooms hr
+        WHERE hr.hardware_id = h.id AND hr.conference_room_id = h.conference_room_id
+      )
+  `);
 }
 
 async function init() {

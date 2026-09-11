@@ -4,8 +4,22 @@ function textValue(value) {
   return (value || '').toString().toLowerCase();
 }
 
+export function formatHardwareLocation(item) {
+  const rooms = item.rooms?.length
+    ? item.rooms
+    : item.room_name
+      ? [{ name: item.room_name, office_name: item.office_name }]
+      : [];
+  if (!rooms.length) return 'Unassigned';
+  return rooms.map((room) => `${room.office_name} — ${room.name}`).join(', ');
+}
+
 function locationValue(item) {
-  if (!item.room_name) return '\uffff unassigned';
+  const rooms = item.rooms || [];
+  if (!rooms.length && !item.room_name) return '\uffff unassigned';
+  if (rooms.length) {
+    return rooms.map((room) => `${room.office_name || ''} ${room.name}`).join(' ').toLowerCase();
+  }
   return `${item.office_name || ''} ${item.room_name}`.toLowerCase();
 }
 

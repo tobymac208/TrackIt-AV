@@ -52,6 +52,13 @@ const SQLITE_SCHEMA = `
     updated_at TEXT NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (conference_room_id) REFERENCES conference_rooms(id) ON DELETE SET NULL
   );
+  CREATE TABLE IF NOT EXISTS hardware_rooms (
+    hardware_id INTEGER NOT NULL,
+    conference_room_id INTEGER NOT NULL,
+    PRIMARY KEY (hardware_id, conference_room_id),
+    FOREIGN KEY (hardware_id) REFERENCES hardware(id) ON DELETE CASCADE,
+    FOREIGN KEY (conference_room_id) REFERENCES conference_rooms(id) ON DELETE CASCADE
+  );
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT NOT NULL UNIQUE,
@@ -77,6 +84,7 @@ async function copy() {
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
   const sqlite = new DatabaseSync(sqlitePath);
   sqlite.exec('PRAGMA foreign_keys = OFF');
+  sqlite.exec('DROP TABLE IF EXISTS hardware_rooms');
   sqlite.exec('DROP TABLE IF EXISTS hardware');
   sqlite.exec('DROP TABLE IF EXISTS conference_rooms');
   sqlite.exec('DROP TABLE IF EXISTS offices');
@@ -117,6 +125,11 @@ async function copy() {
       ],
     },
     {
+      name: 'hardware_rooms',
+      columns: ['hardware_id', 'conference_room_id'],
+      orderBy: 'hardware_id, conference_room_id',
+    },
+    {
       name: 'users',
       columns: ['id', 'username', 'password_hash', 'role', 'totp_secret', 'totp_enabled', 'created_at'],
     },
@@ -128,7 +141,9 @@ async function copy() {
 
   const counts = {};
   for (const table of tables) {
-    const result = await pool.query(`SELECT ${table.columns.join(', ')} FROM ${table.name} ORDER BY id`);
+    const result = await pool.query(
+      `SELECT ${table.columns.join(', ')} FROM ${table.name} ORDER BY ${table.orderBy || 'id'}`
+    );
     const insert = sqlite.prepare(
       `INSERT INTO ${table.name} (${table.columns.join(', ')}) VALUES (${table.columns.map(() => '?').join(', ')})`
     );

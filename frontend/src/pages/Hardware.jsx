@@ -9,7 +9,7 @@ import ImportanceBadge, { formatDate, formatCost, isEosSoon, isEosPast, isWarran
 import Pagination from '../components/Pagination';
 import SortableHeader from '../components/SortableHeader';
 import { getPagination } from '../utils/pagination';
-import { sortHardware, HARDWARE_SORT_COLUMNS } from '../utils/hardwareSort';
+import { sortHardware, HARDWARE_SORT_COLUMNS, formatHardwareLocation } from '../utils/hardwareSort';
 import { hardwareMatchesSearch } from '../utils/hardwareSearch';
 
 const IMPORTANCE_LEVELS = ['', 'low', 'medium', 'high', 'critical'];
@@ -281,7 +281,7 @@ export default function Hardware() {
                         <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{item.description}</div>
                       )}
                     </td>
-                    <td>{item.room_name ? `${item.office_name} — ${item.room_name}` : 'Unassigned'}</td>
+                    <td>{formatHardwareLocation(item)}</td>
                     <td>
                       <ImportanceBadge level={item.importance_level} />
                     </td>

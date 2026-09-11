@@ -18,7 +18,7 @@ const emptyForm = {
   endOfSupportDate: '',
   endOfWarrantyDate: '',
   upgradeRecommendations: '',
-  conferenceRoomId: '',
+  conferenceRoomIds: [],
 };
 
 export default function HardwareForm({ initial, rooms = [], onSubmit }) {
@@ -40,11 +40,16 @@ export default function HardwareForm({ initial, rooms = [], onSubmit }) {
           endOfSupportDate: initial.end_of_support_date || '',
           endOfWarrantyDate: initial.end_of_warranty_date || '',
           upgradeRecommendations: initial.upgrade_recommendations || '',
-          conferenceRoomId: initial.conference_room_id?.toString() || '',
+          conferenceRoomIds: initial.rooms?.length
+            ? initial.rooms.map((room) => room.id)
+            : initial.conference_room_id
+              ? [initial.conference_room_id]
+              : [],
         }
       : {}),
   }));
   const [error, setError] = useState('');
+  const [roomFilter, setRoomFilter] = useState('');
 
   const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
 
@@ -80,7 +85,7 @@ export default function HardwareForm({ initial, rooms = [], onSubmit }) {
         endOfSupportDate: form.endOfSupportDate || null,
         endOfWarrantyDate: form.endOfWarrantyDate || null,
         upgradeRecommendations: form.upgradeRecommendations || null,
-        conferenceRoomId: form.conferenceRoomId ? Number(form.conferenceRoomId) : null,
+        ...(rooms.length > 0 ? { conferenceRoomIds: form.conferenceRoomIds } : {}),
       });
     } catch (err) {
       setError(err.message);
@@ -155,16 +160,52 @@ export default function HardwareForm({ initial, rooms = [], onSubmit }) {
           <input type="date" value={form.endOfWarrantyDate} onChange={set('endOfWarrantyDate')} />
         </div>
         {rooms.length > 0 && (
-          <div className="form-field">
-            <label>Conference Room</label>
-            <select value={form.conferenceRoomId} onChange={set('conferenceRoomId')}>
-              <option value="">Unassigned</option>
-              {rooms.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.office_name} — {r.name}
-                </option>
-              ))}
-            </select>
+          <div className="form-field full-width">
+            <label>Conference Rooms</label>
+            <p className="room-checklist-hint">
+              Check every room this hardware should appear in. Use this for generic gear (retractors, switchers,
+              extenders) that is the same in many rooms.
+            </p>
+            <input
+              type="search"
+              value={roomFilter}
+              onChange={(e) => setRoomFilter(e.target.value)}
+              placeholder="Filter rooms..."
+              className="room-checklist-filter"
+            />
+            <div className="room-checklist">
+              {rooms
+                .filter((r) => {
+                  const q = roomFilter.trim().toLowerCase();
+                  if (!q) return true;
+                  return `${r.office_name} ${r.name}`.toLowerCase().includes(q);
+                })
+                .map((r) => (
+                  <label key={r.id}>
+                    <input
+                      type="checkbox"
+                      checked={form.conferenceRoomIds.map(Number).includes(Number(r.id))}
+                      onChange={() => {
+                        setForm((f) => {
+                          const id = Number(r.id);
+                          const selected = f.conferenceRoomIds.map(Number);
+                          const has = selected.includes(id);
+                          return {
+                            ...f,
+                            conferenceRoomIds: has ? selected.filter((roomId) => roomId !== id) : [...selected, id],
+                          };
+                        });
+                      }}
+                    />
+                    {r.office_name} — {r.name}
+                  </label>
+                ))}
+            </div>
+            <div className="room-checklist-count">
+              {form.conferenceRoomIds.length === 0
+                ? 'Unassigned'
+                : `${form.conferenceRoomIds.length} room${form.conferenceRoomIds.length === 1 ? '' : 's'} selected`}
+            </div>
           </div>
         )}
         <div className="form-field full-width">

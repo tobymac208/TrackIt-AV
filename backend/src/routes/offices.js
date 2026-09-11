@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../db');
 const asyncHandler = require('../asyncHandler');
+const { syncPrimaryRoom } = require('../hardwareRooms');
 
 const router = express.Router();
 
@@ -106,12 +107,20 @@ router.delete(
       return res.status(404).json({ error: 'Office not found' });
     }
 
-    await db
+    const linked = await db
       .prepare(
-        'UPDATE hardware SET conference_room_id = NULL WHERE conference_room_id IN (SELECT id FROM conference_rooms WHERE office_id = ?)'
+        `
+      SELECT DISTINCT hr.hardware_id
+      FROM hardware_rooms hr
+      JOIN conference_rooms cr ON cr.id = hr.conference_room_id
+      WHERE cr.office_id = ?
+    `
       )
-      .run(req.params.id);
+      .all(req.params.id);
     await db.prepare('DELETE FROM offices WHERE id = ?').run(req.params.id);
+    for (const row of linked) {
+      await syncPrimaryRoom(row.hardware_id);
+    }
     res.status(204).send();
   })
 );

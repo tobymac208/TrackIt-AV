@@ -6,6 +6,14 @@ const { mapHardwareRow } = require('../hardwareMap');
 const { parseCsv } = require('../csvParser');
 const { normalizeMacAddress } = require('../macAddress');
 const { loadRoomIndex, loadOffices, resolveConferenceRoomLocation } = require('../roomMatcher');
+const {
+  parseRoomIds,
+  assertRoomsExist,
+  setHardwareRooms,
+  addHardwareRoom,
+  removeHardwareRoom,
+  withRooms,
+} = require('../hardwareRooms');
 
 const router = express.Router();
 
@@ -70,9 +78,18 @@ function normalizeDate(value) {
   return parsed.toISOString().slice(0, 10);
 }
 
+function sendRoomError(err, res) {
+  if (err.status) {
+    res.status(err.status).json({ error: err.message });
+    return true;
+  }
+  return false;
+}
+
 async function insertHardwareRecord(data) {
+  const roomIds = parseRoomIds(data);
   const result = await insertHardwareStmt.run(
-    data.conferenceRoomId || null,
+    roomIds[0] || null,
     data.manufacturer.trim(),
     data.model.trim(),
     data.description || null,
@@ -89,7 +106,11 @@ async function insertHardwareRecord(data) {
     data.upgradeRecommendations || null
   );
 
-  return await db.prepare(buildHardwareQuery('WHERE h.id = ?')).get(result.lastInsertRowid);
+  const created = await db.prepare(buildHardwareQuery('WHERE h.id = ?')).get(result.lastInsertRowid);
+  if (roomIds.length) {
+    await setHardwareRooms(created.id, roomIds);
+  }
+  return withRooms(created, (row) => row);
 }
 
 function resolveImportLocation(row, offices, roomIndex, defaults) {
@@ -226,7 +247,7 @@ router.post(
 
       try {
         const created = await insertHardwareRecord(data);
-        imported.push(mapHardwareRow(created));
+        imported.push(mapHardwareRow(created, false));
       } catch (err) {
         failed.push({ line: row._line, errors: [err.message] });
       }
@@ -305,30 +326,29 @@ router.patch('/bulk-update', asyncHandler(async (req, res) => {
     values.push(cost);
   }
 
+  const uniqueIds = [...new Set(ids.map(Number))].filter(Boolean);
+
   if (updates.conferenceRoomId !== undefined) {
-    if (updates.conferenceRoomId !== null) {
-      const room = await db.prepare('SELECT id FROM conference_rooms WHERE id = ?').get(updates.conferenceRoomId);
-      if (!room) {
-        return res.status(400).json({ error: 'Conference room not found' });
-      }
+    const roomIds = updates.conferenceRoomId ? [updates.conferenceRoomId] : [];
+    for (const hardwareId of uniqueIds) {
+      await setHardwareRooms(hardwareId, roomIds);
     }
-    setClauses.push('conference_room_id = ?');
-    values.push(updates.conferenceRoomId);
   }
 
-  if (setClauses.length === 0) {
+  if (setClauses.length === 0 && updates.conferenceRoomId === undefined) {
     return res.status(400).json({ error: 'No fields selected to update' });
   }
 
-  setClauses.push("updated_at = datetime('now')");
+  if (setClauses.length > 0) {
+    setClauses.push("updated_at = datetime('now')");
+    const placeholders = uniqueIds.map(() => '?').join(', ');
+    const result = await db
+      .prepare(`UPDATE hardware SET ${setClauses.join(', ')} WHERE id IN (${placeholders})`)
+      .run(...values, ...uniqueIds);
+    return res.json({ updated: result.changes, ids: uniqueIds });
+  }
 
-  const uniqueIds = [...new Set(ids.map(Number))].filter(Boolean);
-  const placeholders = uniqueIds.map(() => '?').join(', ');
-  const result = await db
-    .prepare(`UPDATE hardware SET ${setClauses.join(', ')} WHERE id IN (${placeholders})`)
-    .run(...values, ...uniqueIds);
-
-  res.json({ updated: result.changes, ids: uniqueIds });
+  res.json({ updated: uniqueIds.length, ids: uniqueIds });
 }));
 
 router.get(
@@ -343,7 +363,7 @@ router.get(
       params.push(importance);
     }
     if (unassigned === 'true') {
-      conditions.push('h.conference_room_id IS NULL');
+      conditions.push('NOT EXISTS (SELECT 1 FROM hardware_rooms hr WHERE hr.hardware_id = h.id)');
     }
     if (eosSoon === 'true') {
       conditions.push("h.end_of_support_date IS NOT NULL AND h.end_of_support_date <= date('now', '+90 days')");
@@ -354,7 +374,7 @@ router.get(
 
     const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     const rows = await db.prepare(buildHardwareQuery(whereClause)).all(...params);
-    res.json(rows.map((row) => mapHardwareRow(row)));
+    res.json(await withRooms(rows, (row) => mapHardwareRow(row)));
   })
 );
 
@@ -369,7 +389,7 @@ router.get(
     if (!row) {
       return res.status(404).json({ error: 'Hardware not found' });
     }
-    res.json(mapHardwareRow(row, revealPassword === 'true'));
+    res.json(await withRooms(row, (item) => mapHardwareRow(item, revealPassword === 'true')));
   })
 );
 
@@ -396,36 +416,34 @@ router.post(
     endOfSupportDate,
     endOfWarrantyDate,
     upgradeRecommendations,
-    conferenceRoomId,
   } = req.body;
 
-  if (conferenceRoomId) {
-    const room = await db.prepare('SELECT id FROM conference_rooms WHERE id = ?').get(conferenceRoomId);
-    if (!room) {
-      return res.status(400).json({ error: 'Conference room not found' });
-    }
+  const roomIds = parseRoomIds(req.body);
+  try {
+    await assertRoomsExist(roomIds);
+  } catch (err) {
+    if (sendRoomError(err, res)) return;
+    throw err;
   }
 
-  const result = await insertHardwareStmt.run(
-    conferenceRoomId || null,
-    manufacturer.trim(),
-    model.trim(),
-    description || null,
-    estimatedReplacementCost ?? null,
-    macAddress ? normalizeMacAddress(macAddress) : null,
-    ipAddress || null,
-    serialNumber || null,
-    softwareVersion || null,
-    username || null,
-    password ? encrypt(password) : null,
+  const created = await insertHardwareRecord({
+    manufacturer,
+    model,
+    description,
+    estimatedReplacementCost,
+    macAddress,
+    ipAddress,
+    serialNumber,
+    softwareVersion,
+    username,
+    password,
     importanceLevel,
-    endOfSupportDate || null,
-    endOfWarrantyDate || null,
-    upgradeRecommendations || null
-  );
-
-  const row = await db.prepare(buildHardwareQuery('WHERE h.id = ?')).get(result.lastInsertRowid);
-  res.status(201).json(mapHardwareRow(row));
+    endOfSupportDate,
+    endOfWarrantyDate,
+    upgradeRecommendations,
+    conferenceRoomIds: roomIds,
+  });
+  res.status(201).json(mapHardwareRow(created));
   })
 );
 
@@ -457,13 +475,17 @@ router.put(
     endOfSupportDate = existing.end_of_support_date,
     endOfWarrantyDate = existing.end_of_warranty_date,
     upgradeRecommendations = existing.upgrade_recommendations,
-    conferenceRoomId = existing.conference_room_id,
   } = req.body;
 
-  if (conferenceRoomId) {
-    const room = await db.prepare('SELECT id FROM conference_rooms WHERE id = ?').get(conferenceRoomId);
-    if (!room) {
-      return res.status(400).json({ error: 'Conference room not found' });
+  const roomsProvided =
+    Array.isArray(req.body.conferenceRoomIds) || req.body.conferenceRoomId !== undefined;
+  const roomIds = roomsProvided ? parseRoomIds(req.body) : null;
+  if (roomIds) {
+    try {
+      await assertRoomsExist(roomIds);
+    } catch (err) {
+      if (sendRoomError(err, res)) return;
+      throw err;
     }
   }
 
@@ -476,7 +498,6 @@ router.put(
     .prepare(
       `
     UPDATE hardware SET
-      conference_room_id = ?,
       manufacturer = ?,
       model = ?,
       description = ?,
@@ -496,7 +517,6 @@ router.put(
   `
     )
     .run(
-      conferenceRoomId || null,
       manufacturer.trim(),
       model.trim(),
       description || null,
@@ -514,8 +534,17 @@ router.put(
       req.params.id
     );
 
+  if (roomIds) {
+    try {
+      await setHardwareRooms(req.params.id, roomIds);
+    } catch (err) {
+      if (sendRoomError(err, res)) return;
+      throw err;
+    }
+  }
+
   const row = await db.prepare(buildHardwareQuery('WHERE h.id = ?')).get(req.params.id);
-  res.json(mapHardwareRow(row));
+  res.json(await withRooms(row, (item) => mapHardwareRow(item)));
   })
 );
 
@@ -527,25 +556,22 @@ router.patch(
       return res.status(404).json({ error: 'Hardware not found' });
     }
 
-    const { conferenceRoomId } = req.body;
-    if (conferenceRoomId !== null && conferenceRoomId !== undefined) {
-      const room = await db.prepare('SELECT id FROM conference_rooms WHERE id = ?').get(conferenceRoomId);
-      if (!room) {
-        return res.status(400).json({ error: 'Conference room not found' });
+    const { conferenceRoomId, fromRoomId } = req.body;
+    try {
+      if (conferenceRoomId !== null && conferenceRoomId !== undefined) {
+        await addHardwareRoom(req.params.id, Number(conferenceRoomId));
+      } else if (fromRoomId) {
+        await removeHardwareRoom(req.params.id, Number(fromRoomId));
+      } else {
+        await setHardwareRooms(req.params.id, []);
       }
+    } catch (err) {
+      if (sendRoomError(err, res)) return;
+      throw err;
     }
 
-    await db
-      .prepare(
-        `
-    UPDATE hardware SET conference_room_id = ?, updated_at = datetime('now')
-    WHERE id = ?
-  `
-      )
-      .run(conferenceRoomId ?? null, req.params.id);
-
     const row = await db.prepare(buildHardwareQuery('WHERE h.id = ?')).get(req.params.id);
-    res.json(mapHardwareRow(row));
+    res.json(await withRooms(row, (item) => mapHardwareRow(item)));
   })
 );
 

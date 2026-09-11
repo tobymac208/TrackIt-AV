@@ -68,10 +68,10 @@ export const api = {
     request(`/hardware/${id}${revealPassword ? '?revealPassword=true' : ''}`),
   createHardware: (body) => request('/hardware', { method: 'POST', body: JSON.stringify(body) }),
   updateHardware: (id, body) => request(`/hardware/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
-  assignHardware: (id, conferenceRoomId) =>
+  assignHardware: (id, conferenceRoomId, extras = {}) =>
     request(`/hardware/${id}/assign`, {
       method: 'PATCH',
-      body: JSON.stringify({ conferenceRoomId }),
+      body: JSON.stringify({ conferenceRoomId, ...extras }),
     }),
   deleteHardware: (id) => request(`/hardware/${id}`, { method: 'DELETE' }),
   deleteHardwareBulk: (ids) => Promise.all(ids.map((id) => request(`/hardware/${id}`, { method: 'DELETE' }))),

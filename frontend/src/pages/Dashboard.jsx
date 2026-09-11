@@ -10,6 +10,7 @@ import {
   REPLACEMENT_LEAD_TIME,
   buildReplacementReview,
 } from '../utils/replacementReview';
+import { formatHardwareLocation } from '../utils/hardwareSort';
 
 export default function Dashboard() {
   const { isAdmin } = useAuth();
@@ -42,7 +43,7 @@ export default function Dashboard() {
   if (loading) return <div className="loading">Loading dashboard...</div>;
   if (error) return <div className="error-banner">{error}</div>;
 
-  const unassigned = hardware.filter((h) => !h.conference_room_id).length;
+  const unassigned = hardware.filter((h) => !(h.rooms?.length || h.conference_room_id)).length;
   const eosSoon = hardware.filter((h) => isEosSoon(h.end_of_support_date));
   const eosPast = hardware.filter((h) => isEosPast(h.end_of_support_date));
   const warrantyExpired = hardware.filter((h) => isWarrantyPast(h.end_of_warranty_date));
@@ -233,7 +234,7 @@ export default function Dashboard() {
                             {item.manufacturer} {item.model}
                           </strong>
                         </td>
-                        <td>{item.room_name ? `${item.office_name} — ${item.room_name}` : 'Unassigned'}</td>
+                        <td>{formatHardwareLocation(item)}</td>
                         <td>
                           <ImportanceBadge level={item.importance_level} />
                         </td>
@@ -308,7 +309,7 @@ export default function Dashboard() {
                           {item.manufacturer} {item.model}
                         </td>
                         <td>
-                          {item.room_name ? `${item.office_name} — ${item.room_name}` : 'Unassigned'}
+                          {formatHardwareLocation(item)}
                         </td>
                         <td>
                           <ImportanceBadge level={item.importance_level} />

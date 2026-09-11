@@ -2,6 +2,7 @@ const express = require('express');
 const db = require('../db');
 const asyncHandler = require('../asyncHandler');
 const { mapHardwareRow } = require('../hardwareMap');
+const { syncPrimaryRoom, withRooms } = require('../hardwareRooms');
 
 const router = express.Router();
 
@@ -22,7 +23,7 @@ function getRoomQuery(whereClause = '') {
   return `
     SELECT cr.*,
       o.name AS office_name,
-      (SELECT COUNT(*) FROM hardware h WHERE h.conference_room_id = cr.id) AS hardware_count
+      (SELECT COUNT(*) FROM hardware_rooms hr WHERE hr.conference_room_id = cr.id) AS hardware_count
     FROM conference_rooms cr
     JOIN offices o ON o.id = cr.office_id
     ${whereClause}
@@ -67,15 +68,16 @@ router.get(
         `
     SELECT h.*, cr.name AS room_name, o.name AS office_name
     FROM hardware h
-    LEFT JOIN conference_rooms cr ON cr.id = h.conference_room_id
-    LEFT JOIN offices o ON o.id = cr.office_id
-    WHERE h.conference_room_id = ?
+    JOIN hardware_rooms hr ON hr.hardware_id = h.id
+    JOIN conference_rooms cr ON cr.id = hr.conference_room_id
+    JOIN offices o ON o.id = cr.office_id
+    WHERE hr.conference_room_id = ?
     ORDER BY h.manufacturer, h.model
   `
       )
       .all(req.params.id);
 
-    res.json(hardware.map((item) => mapHardwareRow(item)));
+    res.json(await withRooms(hardware, (item) => mapHardwareRow(item)));
   })
 );
 
@@ -175,8 +177,13 @@ router.delete(
       return res.status(404).json({ error: 'Conference room not found' });
     }
 
-    await db.prepare('UPDATE hardware SET conference_room_id = NULL WHERE conference_room_id = ?').run(req.params.id);
+    const linked = await db
+      .prepare('SELECT hardware_id FROM hardware_rooms WHERE conference_room_id = ?')
+      .all(req.params.id);
     await db.prepare('DELETE FROM conference_rooms WHERE id = ?').run(req.params.id);
+    for (const row of linked) {
+      await syncPrimaryRoom(row.hardware_id);
+    }
     res.status(204).send();
   })
 );

@@ -766,6 +766,39 @@ textarea {
   color: var(--danger);
 }
 
+.room-checklist-hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.room-checklist-filter {
+  max-width: 100%;
+}
+
+.room-checklist {
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg);
+}
+
+.room-checklist label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 400;
+  padding: 0.3rem 0;
+}
+
+.room-checklist-count {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
 .form-error {
   color: var(--danger);
   font-size: 0.8rem;

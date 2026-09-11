@@ -12,7 +12,7 @@ export default function RoomDetail() {
   const { id } = useParams();
   const [room, setRoom] = useState(null);
   const [hardware, setHardware] = useState([]);
-  const [unassigned, setUnassigned] = useState([]);
+  const [assignable, setAssignable] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showCreate, setShowCreate] = useState(false);
@@ -20,11 +20,12 @@ export default function RoomDetail() {
 
   const load = () => {
     setLoading(true);
-    Promise.all([api.getRoom(id), api.getRoomHardware(id), api.getHardware({ unassigned: 'true' })])
-      .then(([rm, hw, unassignedHw]) => {
+    Promise.all([api.getRoom(id), api.getRoomHardware(id), api.getHardware()])
+      .then(([rm, hw, allHw]) => {
         setRoom(rm);
         setHardware(hw);
-        setUnassigned(unassignedHw);
+        const inRoom = new Set(hw.map((item) => item.id));
+        setAssignable(allHw.filter((item) => !inRoom.has(item.id)));
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
@@ -46,7 +47,7 @@ export default function RoomDetail() {
   const handleUnassign = async (item) => {
     if (!window.confirm(`Remove "${item.manufacturer} ${item.model}" from this room?`)) return;
     try {
-      await api.assignHardware(item.id, null);
+      await api.assignHardware(item.id, null, { fromRoomId: Number(id) });
       load();
     } catch (err) {
       setError(err.message);
@@ -93,14 +94,15 @@ export default function RoomDetail() {
         </div>
       )}
 
-      {isAdmin && unassigned.length > 0 && (
+      {isAdmin && assignable.length > 0 && (
         <div className="filters" style={{ marginBottom: '1.5rem' }}>
           <label htmlFor="assign-hardware">Add existing hardware:</label>
           <select id="assign-hardware" value={assignId} onChange={(e) => setAssignId(e.target.value)}>
-            <option value="">Select unassigned hardware...</option>
-            {unassigned.map((h) => (
+            <option value="">Select hardware...</option>
+            {assignable.map((h) => (
               <option key={h.id} value={h.id}>
                 {h.manufacturer} {h.model}
+                {h.rooms?.length ? ` (${h.rooms.length} room${h.rooms.length === 1 ? '' : 's'})` : ''}
               </option>
             ))}
           </select>

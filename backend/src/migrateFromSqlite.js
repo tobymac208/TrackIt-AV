@@ -67,14 +67,22 @@ async function main() {
   const hardware = sqlite.prepare('SELECT * FROM hardware').all();
   const users = sqlite.prepare('SELECT * FROM users').all();
   const stock = sqlite.prepare('SELECT * FROM shelf_stock').all();
+  let hardwareRooms = [];
+  try {
+    hardwareRooms = sqlite.prepare('SELECT * FROM hardware_rooms').all();
+  } catch {
+    hardwareRooms = [];
+  }
 
   console.log(
-    `Copying ${offices.length} offices, ${rooms.length} rooms, ${hardware.length} hardware, ${users.length} users, ${stock.length} shelf stock from ${sqlitePath}`
+    `Copying ${offices.length} offices, ${rooms.length} rooms, ${hardware.length} hardware, ${users.length} users, ${stock.length} shelf stock, ${hardwareRooms.length} hardware rooms from ${sqlitePath}`
   );
 
   try {
     await client.query('BEGIN');
-    await client.query('TRUNCATE hardware, conference_rooms, offices, users, shelf_stock RESTART IDENTITY CASCADE');
+    await client.query(
+      'TRUNCATE hardware_rooms, hardware, conference_rooms, offices, users, shelf_stock RESTART IDENTITY CASCADE'
+    );
 
     for (const row of offices) {
       await client.query('INSERT INTO offices (id, name, created_at) VALUES ($1, $2, $3)', [
@@ -120,6 +128,13 @@ async function main() {
           row.updated_at,
         ]
       );
+    }
+
+    for (const row of hardwareRooms) {
+      await client.query('INSERT INTO hardware_rooms (hardware_id, conference_room_id) VALUES ($1, $2)', [
+        row.hardware_id,
+        row.conference_room_id,
+      ]);
     }
 
     for (const row of users) {

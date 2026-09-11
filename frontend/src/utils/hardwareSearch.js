@@ -13,6 +13,7 @@ export function hardwareMatchesSearch(item, query) {
     item.office_name,
     item.room_name,
     item.software_version,
+    ...(item.rooms || []).flatMap((room) => [room.name, room.office_name, `${room.office_name} ${room.name}`]),
   ].map((value) => (value || '').toLowerCase());
 
   if (fields.some((field) => field.includes(q))) {
