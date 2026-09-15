@@ -13,7 +13,8 @@ import {
 import { formatHardwareLocation } from '../utils/hardwareSort';
 
 export default function Dashboard() {
-  const { isAdmin } = useAuth();
+  const { can } = useAuth();
+  const canWriteHardware = can('hardware', 'write');
   const [hardware, setHardware] = useState([]);
   const [offices, setOffices] = useState([]);
   const [rooms, setRooms] = useState([]);
@@ -26,7 +27,11 @@ export default function Dashboard() {
   const [eosOpen, setEosOpen] = useState(true);
 
   useEffect(() => {
-    Promise.all([api.getHardware(), api.getOffices(), api.getRooms()])
+    Promise.all([
+      can('hardware', 'read') ? api.getHardware() : Promise.resolve([]),
+      can('offices', 'read') ? api.getOffices() : Promise.resolve([]),
+      can('rooms', 'read') ? api.getRooms() : Promise.resolve([]),
+    ])
       .then(([hw, off, rm]) => {
         setHardware(hw);
         setOffices(off);
@@ -78,7 +83,7 @@ export default function Dashboard() {
           <h2>Dashboard</h2>
           <p>Overview of your AV hardware inventory</p>
         </div>
-        {isAdmin && (
+        {canWriteHardware && (
           <div className="actions">
             <Link to="/hardware" className="btn btn-primary">
               Add Hardware

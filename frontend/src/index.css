@@ -998,6 +998,108 @@ textarea {
   color: var(--text-muted);
 }
 
+.permission-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0.75rem 0 1rem;
+}
+
+.permission-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 0.75rem;
+  align-items: center;
+  font-size: 0.875rem;
+}
+
+.permission-row label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 400;
+}
+
+.account-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.account-reset {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.account-create-form h3,
+.login-card h3 {
+  margin: 0 0 0.75rem;
+}
+
+.settings-shell {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.5rem;
+}
+
+.settings-vpanel {
+  width: 220px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.settings-vpanel-link {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.7rem 0.8rem;
+  border-radius: 8px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.settings-vpanel-link span {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.settings-vpanel-link:hover {
+  background: var(--bg);
+}
+
+.settings-vpanel-link.active {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
+.settings-vpanel-link.active span {
+  color: inherit;
+  opacity: 0.85;
+}
+
+.settings-content {
+  min-width: 0;
+  flex: 1;
+}
+
+@media (max-width: 800px) {
+  .settings-shell {
+    flex-direction: column;
+  }
+
+  .settings-vpanel {
+    width: 100%;
+  }
+}
+
 .settings-section {
   padding: 1.25rem;
 }

@@ -10,9 +10,13 @@ import RoomDetail from './pages/RoomDetail';
 import Hardware from './pages/Hardware';
 import Inventory from './pages/Inventory';
 import Settings from './pages/Settings';
+import SettingsAccounts from './pages/SettingsAccounts';
+import SettingsMfa from './pages/SettingsMfa';
+import SettingsTheme from './pages/SettingsTheme';
+import SetupAccount from './pages/SetupAccount';
 
 export default function App() {
-  const { user, ready, isAdmin } = useAuth();
+  const { user, ready, can } = useAuth();
 
   if (!ready) {
     return <div className="loading">Loading...</div>;
@@ -27,16 +31,25 @@ export default function App() {
     );
   }
 
+  if (user.setupOnly) {
+    return <SetupAccount />;
+  }
+
   return (
     <Layout>
       <Routes>
         <Route path="/" element={<Dashboard />} />
-        <Route path="/offices" element={<Offices />} />
-        <Route path="/rooms" element={<Rooms />} />
-        <Route path="/rooms/:id" element={<RoomDetail />} />
-        <Route path="/hardware" element={<Hardware />} />
-        <Route path="/inventory" element={isAdmin ? <Inventory /> : <Navigate to="/" replace />} />
-        <Route path="/settings" element={<Settings />} />
+        <Route path="/offices" element={can('offices', 'read') ? <Offices /> : <Navigate to="/" replace />} />
+        <Route path="/rooms" element={can('rooms', 'read') ? <Rooms /> : <Navigate to="/" replace />} />
+        <Route path="/rooms/:id" element={can('rooms', 'read') ? <RoomDetail /> : <Navigate to="/" replace />} />
+        <Route path="/hardware" element={can('hardware', 'read') ? <Hardware /> : <Navigate to="/" replace />} />
+        <Route path="/inventory" element={can('inventory', 'read') ? <Inventory /> : <Navigate to="/" replace />} />
+        <Route path="/settings" element={<Settings />}>
+          <Route index element={<Navigate to="accounts" replace />} />
+          <Route path="accounts" element={<SettingsAccounts />} />
+          <Route path="mfa" element={<SettingsMfa />} />
+          <Route path="theme" element={<SettingsTheme />} />
+        </Route>
         <Route path="/login" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>

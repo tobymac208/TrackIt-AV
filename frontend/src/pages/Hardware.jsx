@@ -15,7 +15,8 @@ import { hardwareMatchesSearch } from '../utils/hardwareSearch';
 const IMPORTANCE_LEVELS = ['', 'low', 'medium', 'high', 'critical'];
 
 export default function Hardware() {
-  const { isAdmin } = useAuth();
+  const { can } = useAuth();
+  const canWrite = can('hardware', 'write');
   const [hardware, setHardware] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -168,7 +169,7 @@ export default function Hardware() {
             {filtered.length !== hardware.length && ` (of ${hardware.length} total)`}
           </p>
         </div>
-        {isAdmin && (
+        {canWrite && (
           <div className="actions">
             <button className="btn btn-secondary" onClick={() => setShowImport(true)}>
               Import CSV
@@ -206,7 +207,7 @@ export default function Hardware() {
           <option value="">All</option>
           <option value="expired">Expired</option>
         </select>
-        {isAdmin && selectedCount > 0 && (
+        {canWrite && selectedCount > 0 && (
           <>
             <span className="selection-count">{selectedCount} selected</span>
             <button className="btn btn-secondary btn-sm" onClick={() => setShowBulkEdit(true)} disabled={deleting}>
@@ -233,7 +234,7 @@ export default function Hardware() {
             <table>
               <thead>
                 <tr>
-                  {isAdmin && (
+                  {canWrite && (
                     <th className="col-check">
                       <input
                         type="checkbox"
@@ -256,13 +257,13 @@ export default function Hardware() {
                     />
                   ))}
                   <th>Credentials</th>
-                  {isAdmin && <th>Actions</th>}
+                  {canWrite && <th>Actions</th>}
                 </tr>
               </thead>
               <tbody>
                 {paginatedItems.map((item, index) => (
-                  <tr key={item.id} className={`${rowClass(item)}${isAdmin && selectedIds.has(item.id) ? ' row-selected' : ''}`}>
-                    {isAdmin && (
+                  <tr key={item.id} className={`${rowClass(item)}${canWrite && selectedIds.has(item.id) ? ' row-selected' : ''}`}>
+                    {canWrite && (
                       <td className="col-check">
                         <input
                           type="checkbox"
@@ -293,7 +294,7 @@ export default function Hardware() {
                     <td>
                       {item.username && <div style={{ fontSize: '0.8rem' }}>{item.username}</div>}
                       {item.has_password ? (
-                        isAdmin ? (
+                        canWrite ? (
                           revealedPasswords[item.id] ? (
                             <code style={{ fontSize: '0.75rem' }}>{revealedPasswords[item.id]}</code>
                           ) : (
@@ -308,7 +309,7 @@ export default function Hardware() {
                         '—'
                       )}
                     </td>
-                    {isAdmin && (
+                    {canWrite && (
                       <td>
                         <div className="actions">
                           <button className="btn btn-secondary btn-sm" onClick={() => setModal({ mode: 'edit', ...item })}>

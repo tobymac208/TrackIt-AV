@@ -56,6 +56,11 @@ const SQLITE_SCHEMA = `
     role TEXT NOT NULL CHECK (role IN ('admin', 'user')),
     totp_secret TEXT,
     totp_enabled INTEGER NOT NULL DEFAULT 0,
+    must_change_password INTEGER NOT NULL DEFAULT 0,
+    must_setup_totp INTEGER NOT NULL DEFAULT 0,
+    mfa_required INTEGER NOT NULL DEFAULT 0,
+    disabled INTEGER NOT NULL DEFAULT 0,
+    permissions TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
@@ -122,6 +127,11 @@ const POSTGRES_SCHEMA = `
     role TEXT NOT NULL CHECK (role IN ('admin', 'user')),
     totp_secret TEXT,
     totp_enabled INTEGER NOT NULL DEFAULT 0,
+    must_change_password INTEGER NOT NULL DEFAULT 0,
+    must_setup_totp INTEGER NOT NULL DEFAULT 0,
+    mfa_required INTEGER NOT NULL DEFAULT 0,
+    disabled INTEGER NOT NULL DEFAULT 0,
+    permissions TEXT,
     created_at TEXT NOT NULL DEFAULT TO_CHAR(NOW(), 'YYYY-MM-DD HH24:MI:SS')
   );
 
@@ -238,6 +248,21 @@ function createSqliteDriver() {
   if (!userColumns.some((col) => col.name === 'totp_enabled')) {
     db.exec('ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0');
   }
+  if (!userColumns.some((col) => col.name === 'must_change_password')) {
+    db.exec('ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0');
+  }
+  if (!userColumns.some((col) => col.name === 'must_setup_totp')) {
+    db.exec('ALTER TABLE users ADD COLUMN must_setup_totp INTEGER NOT NULL DEFAULT 0');
+  }
+  if (!userColumns.some((col) => col.name === 'mfa_required')) {
+    db.exec('ALTER TABLE users ADD COLUMN mfa_required INTEGER NOT NULL DEFAULT 0');
+  }
+  if (!userColumns.some((col) => col.name === 'disabled')) {
+    db.exec('ALTER TABLE users ADD COLUMN disabled INTEGER NOT NULL DEFAULT 0');
+  }
+  if (!userColumns.some((col) => col.name === 'permissions')) {
+    db.exec('ALTER TABLE users ADD COLUMN permissions TEXT');
+  }
 
   db.exec(`
     INSERT INTO hardware_rooms (hardware_id, conference_room_id)
@@ -314,6 +339,11 @@ async function initPostgresSchema(pgDriver) {
   await pgDriver.exec('ALTER TABLE conference_rooms ADD COLUMN IF NOT EXISTS issue_description TEXT');
   await pgDriver.exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_secret TEXT');
   await pgDriver.exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_enabled INTEGER NOT NULL DEFAULT 0');
+  await pgDriver.exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password INTEGER NOT NULL DEFAULT 0');
+  await pgDriver.exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS must_setup_totp INTEGER NOT NULL DEFAULT 0');
+  await pgDriver.exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_required INTEGER NOT NULL DEFAULT 0');
+  await pgDriver.exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS disabled INTEGER NOT NULL DEFAULT 0');
+  await pgDriver.exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS permissions TEXT');
   await pgDriver.exec(`
     INSERT INTO hardware_rooms (hardware_id, conference_room_id)
     SELECT h.id, h.conference_room_id

@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { api, AUTH_EXPIRED_EVENT, TOKEN_KEY } from './api/client';
+import { can as canPermission } from './permissions';
 
 const AuthContext = createContext(null);
 
@@ -77,6 +78,12 @@ export function AuthProvider({ children }) {
       user,
       ready,
       isAdmin: user?.role === 'admin',
+      can: (resource, action) => canPermission(user, resource, action),
+      applyAuthResult(result) {
+        if (result?.token) localStorage.setItem(TOKEN_KEY, result.token);
+        if (result?.user) setUser(result.user);
+        return result;
+      },
       async login(username, password) {
         const result = await api.login(username, password);
         if (result.requiresTotp) {

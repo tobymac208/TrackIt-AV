@@ -139,8 +139,10 @@ async function main() {
 
     for (const row of users) {
       await client.query(
-        `INSERT INTO users (id, username, password_hash, role, totp_secret, totp_enabled, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        `INSERT INTO users (
+          id, username, password_hash, role, totp_secret, totp_enabled,
+          must_change_password, must_setup_totp, mfa_required, disabled, permissions, created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
         [
           row.id,
           row.username,
@@ -148,6 +150,11 @@ async function main() {
           row.role,
           row.totp_secret || null,
           row.totp_enabled ? 1 : 0,
+          row.must_change_password ? 1 : 0,
+          row.must_setup_totp ? 1 : 0,
+          row.mfa_required ? 1 : 0,
+          row.disabled ? 1 : 0,
+          row.permissions || null,
           row.created_at,
         ]
       );

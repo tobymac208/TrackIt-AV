@@ -7,7 +7,8 @@ import Pagination from '../components/Pagination';
 import { getPagination } from '../utils/pagination';
 
 export default function Offices() {
-  const { isAdmin } = useAuth();
+  const { can } = useAuth();
+  const canWrite = can('offices', 'write');
   const [offices, setOffices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -60,7 +61,7 @@ export default function Offices() {
           <h2>Offices</h2>
           <p>{offices.length} office{offices.length !== 1 ? 's' : ''} listed</p>
         </div>
-        {isAdmin && (
+        {canWrite && (
           <button className="btn btn-primary" onClick={() => setModal({ mode: 'create' })}>
             Add Office
           </button>
@@ -82,7 +83,7 @@ export default function Offices() {
                   <th>Name</th>
                   <th>Rooms</th>
                   <th>Created</th>
-                  {isAdmin && <th>Actions</th>}
+                  {canWrite && <th>Actions</th>}
                 </tr>
               </thead>
               <tbody>
@@ -92,7 +93,7 @@ export default function Offices() {
                     <td>{office.name}</td>
                     <td>{office.room_count}</td>
                     <td>{new Date(office.created_at).toLocaleDateString()}</td>
-                    {isAdmin && (
+                    {canWrite && (
                       <td>
                         <div className="actions">
                           <button className="btn btn-secondary btn-sm" onClick={() => setModal({ mode: 'edit', ...office })}>

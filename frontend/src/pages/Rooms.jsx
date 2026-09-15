@@ -9,7 +9,8 @@ import Pagination from '../components/Pagination';
 import { getPagination } from '../utils/pagination';
 
 export default function Rooms() {
-  const { isAdmin } = useAuth();
+  const { can } = useAuth();
+  const canWrite = can('rooms', 'write');
   const navigate = useNavigate();
   const [rooms, setRooms] = useState([]);
   const [offices, setOffices] = useState([]);
@@ -67,7 +68,7 @@ export default function Rooms() {
           <h2>Conference Rooms</h2>
           <p>{rooms.length} room{rooms.length !== 1 ? 's' : ''} listed</p>
         </div>
-        {isAdmin && (
+        {canWrite && (
           <button
             className="btn btn-primary"
             onClick={() => setModal({ mode: 'create' })}
@@ -90,7 +91,7 @@ export default function Rooms() {
         </select>
       </div>
 
-      {isAdmin && offices.length === 0 && !loading && (
+      {canWrite && offices.length === 0 && !loading && (
         <div className="error-banner">Create an office before adding conference rooms.</div>
       )}
 
@@ -110,7 +111,7 @@ export default function Rooms() {
                   <th>Office</th>
                   <th>Status</th>
                   <th>Hardware</th>
-                  {isAdmin && <th>Actions</th>}
+                  {canWrite && <th>Actions</th>}
                 </tr>
               </thead>
               <tbody>
@@ -126,7 +127,7 @@ export default function Rooms() {
                       )}
                     </td>
                     <td>{room.hardware_count}</td>
-                    {isAdmin && (
+                    {canWrite && (
                       <td onClick={(e) => e.stopPropagation()}>
                         <div className="actions">
                           <button className="btn btn-secondary btn-sm" onClick={() => setModal({ mode: 'edit', ...room })}>

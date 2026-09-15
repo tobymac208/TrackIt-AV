@@ -8,7 +8,8 @@ import ImportanceBadge, { formatDate, formatCost } from '../components/Importanc
 import RoomStatusBadge from '../components/RoomStatusBadge';
 
 export default function RoomDetail() {
-  const { isAdmin } = useAuth();
+  const { can } = useAuth();
+  const canWrite = can('hardware', 'write');
   const { id } = useParams();
   const [room, setRoom] = useState(null);
   const [hardware, setHardware] = useState([]);
@@ -78,7 +79,7 @@ export default function RoomDetail() {
             hardware item{hardware.length !== 1 ? 's' : ''}
           </p>
         </div>
-        {isAdmin && (
+        {canWrite && (
           <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
             Create Hardware for Room
           </button>
@@ -94,7 +95,7 @@ export default function RoomDetail() {
         </div>
       )}
 
-      {isAdmin && assignable.length > 0 && (
+      {canWrite && assignable.length > 0 && (
         <div className="filters" style={{ marginBottom: '1.5rem' }}>
           <label htmlFor="assign-hardware">Add existing hardware:</label>
           <select id="assign-hardware" value={assignId} onChange={(e) => setAssignId(e.target.value)}>
@@ -127,7 +128,7 @@ export default function RoomDetail() {
                   <th>EOS Date</th>
                   <th>Warranty</th>
                   <th>Est. Cost</th>
-                  {isAdmin && <th>Actions</th>}
+                  {canWrite && <th>Actions</th>}
                 </tr>
               </thead>
               <tbody>
@@ -149,7 +150,7 @@ export default function RoomDetail() {
                     <td>{formatDate(item.end_of_support_date)}</td>
                     <td>{formatDate(item.end_of_warranty_date)}</td>
                     <td>{formatCost(item.estimated_replacement_cost)}</td>
-                    {isAdmin && (
+                    {canWrite && (
                       <td>
                         <button className="btn btn-secondary btn-sm" onClick={() => handleUnassign(item)}>
                           Remove

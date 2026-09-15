@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
+import { useAuth } from '../auth';
 import Modal from '../components/Modal';
 import InventoryForm from '../components/InventoryForm';
 import Pagination from '../components/Pagination';
 import { getPagination } from '../utils/pagination';
 
 export default function Inventory() {
+  const { can } = useAuth();
+  const canWrite = can('inventory', 'write');
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -74,9 +77,11 @@ export default function Inventory() {
             {items.length > 0 && ` · ${totalUnits} unit${totalUnits !== 1 ? 's' : ''} on hand`}
           </p>
         </div>
-        <button className="btn btn-primary" onClick={() => setModal({ mode: 'create' })}>
-          Add Shelf Stock
-        </button>
+        {canWrite && (
+          <button className="btn btn-primary" onClick={() => setModal({ mode: 'create' })}>
+            Add Shelf Stock
+          </button>
+        )}
       </div>
 
       {error && <div className="error-banner">{error}</div>}
@@ -97,7 +102,7 @@ export default function Inventory() {
                   <th>Quantity</th>
                   <th>Location</th>
                   <th>Notes</th>
-                  <th>Actions</th>
+                  {canWrite && <th>Actions</th>}
                 </tr>
               </thead>
               <tbody>
@@ -110,39 +115,45 @@ export default function Inventory() {
                       </strong>
                     </td>
                     <td>
-                      <div className="qty-stepper">
-                        <button
-                          type="button"
-                          className="btn btn-secondary btn-sm"
-                          onClick={() => handleQuantity(item, -1)}
-                          disabled={item.quantity <= 0}
-                          aria-label={`Decrease ${item.manufacturer} ${item.model} quantity`}
-                        >
-                          −
-                        </button>
-                        <span>{item.quantity}</span>
-                        <button
-                          type="button"
-                          className="btn btn-secondary btn-sm"
-                          onClick={() => handleQuantity(item, 1)}
-                          aria-label={`Increase ${item.manufacturer} ${item.model} quantity`}
-                        >
-                          +
-                        </button>
-                      </div>
+                      {canWrite ? (
+                        <div className="qty-stepper">
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => handleQuantity(item, -1)}
+                            disabled={item.quantity <= 0}
+                            aria-label={`Decrease ${item.manufacturer} ${item.model} quantity`}
+                          >
+                            −
+                          </button>
+                          <span>{item.quantity}</span>
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => handleQuantity(item, 1)}
+                            aria-label={`Increase ${item.manufacturer} ${item.model} quantity`}
+                          >
+                            +
+                          </button>
+                        </div>
+                      ) : (
+                        item.quantity
+                      )}
                     </td>
                     <td>{item.location || '—'}</td>
                     <td>{item.notes || '—'}</td>
-                    <td>
-                      <div className="actions">
-                        <button className="btn btn-secondary btn-sm" onClick={() => setModal({ mode: 'edit', ...item })}>
-                          Edit
-                        </button>
-                        <button className="btn btn-danger btn-sm" onClick={() => handleDelete(item)}>
-                          Delete
-                        </button>
-                      </div>
-                    </td>
+                    {canWrite && (
+                      <td>
+                        <div className="actions">
+                          <button className="btn btn-secondary btn-sm" onClick={() => setModal({ mode: 'edit', ...item })}>
+                            Edit
+                          </button>
+                          <button className="btn btn-danger btn-sm" onClick={() => handleDelete(item)}>
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

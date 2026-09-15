@@ -27,6 +27,7 @@ const SQLITE_SCHEMA = `
     office_id INTEGER NOT NULL,
     name TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'functional' CHECK (status IN ('functional', 'issue')),
+    issue_description TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (office_id) REFERENCES offices(id) ON DELETE CASCADE,
     UNIQUE (office_id, name)
@@ -66,6 +67,11 @@ const SQLITE_SCHEMA = `
     role TEXT NOT NULL CHECK (role IN ('admin', 'user')),
     totp_secret TEXT,
     totp_enabled INTEGER NOT NULL DEFAULT 0,
+    must_change_password INTEGER NOT NULL DEFAULT 0,
+    must_setup_totp INTEGER NOT NULL DEFAULT 0,
+    mfa_required INTEGER NOT NULL DEFAULT 0,
+    disabled INTEGER NOT NULL DEFAULT 0,
+    permissions TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
   CREATE TABLE IF NOT EXISTS shelf_stock (
@@ -99,7 +105,7 @@ async function copy() {
     },
     {
       name: 'conference_rooms',
-      columns: ['id', 'office_id', 'name', 'status', 'created_at'],
+      columns: ['id', 'office_id', 'name', 'status', 'issue_description', 'created_at'],
     },
     {
       name: 'hardware',
@@ -131,7 +137,20 @@ async function copy() {
     },
     {
       name: 'users',
-      columns: ['id', 'username', 'password_hash', 'role', 'totp_secret', 'totp_enabled', 'created_at'],
+      columns: [
+        'id',
+        'username',
+        'password_hash',
+        'role',
+        'totp_secret',
+        'totp_enabled',
+        'must_change_password',
+        'must_setup_totp',
+        'mfa_required',
+        'disabled',
+        'permissions',
+        'created_at',
+      ],
     },
     {
       name: 'shelf_stock',

@@ -8,13 +8,14 @@ const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 
 const db = require('./db');
-const { seedUsers, requireAuth, requireAdmin, requireWriteAdmin } = require('./auth');
+const { seedUsers, requireAuth, requireAdmin, requireRead, requireWriteAdmin } = require('./auth');
 
 const authRouter = require('./routes/auth');
 const officesRouter = require('./routes/offices');
 const roomsRouter = require('./routes/rooms');
 const hardwareRouter = require('./routes/hardware');
 const inventoryRouter = require('./routes/inventory');
+const usersRouter = require('./routes/users');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -70,10 +71,11 @@ app.use('/api/auth', authRouter);
 app.use('/api', requireAuth);
 app.use('/api', requireWriteAdmin);
 
-app.use('/api/offices', officesRouter);
-app.use('/api/rooms', roomsRouter);
-app.use('/api/hardware', hardwareRouter);
-app.use('/api/inventory', requireAdmin, inventoryRouter);
+app.use('/api/offices', requireRead('offices'), officesRouter);
+app.use('/api/rooms', requireRead('rooms'), roomsRouter);
+app.use('/api/hardware', requireRead('hardware'), hardwareRouter);
+app.use('/api/inventory', requireRead('inventory'), inventoryRouter);
+app.use('/api/users', requireAdmin, usersRouter);
 
 if (fs.existsSync(frontendDist)) {
   app.use(express.static(frontendDist));

@@ -7,8 +7,8 @@ const {
   startTotpSetup,
   enableTotp,
   disableTotp,
+  changePassword,
   requireAuth,
-  requireAdmin,
 } = require('../auth');
 const { isLocked, recordFailure, clearFailures } = require('../loginGuard');
 
@@ -52,13 +52,12 @@ router.post(
 );
 
 router.get('/me', requireAuth, (req, res) => {
-  res.json({ id: req.user.id, username: req.user.username, role: req.user.role });
+  res.json(req.user);
 });
 
 router.get(
   '/totp/status',
   requireAuth,
-  requireAdmin,
   asyncHandler(async (req, res) => {
     res.json(await getTotpStatus(req.user.id));
   })
@@ -67,7 +66,6 @@ router.get(
 router.post(
   '/totp/setup',
   requireAuth,
-  requireAdmin,
   asyncHandler(async (req, res) => {
     try {
       res.json(await startTotpSetup(req.user));
@@ -80,7 +78,6 @@ router.post(
 router.post(
   '/totp/enable',
   requireAuth,
-  requireAdmin,
   asyncHandler(async (req, res) => {
     try {
       res.json(await enableTotp(req.user, req.body?.code));
@@ -93,10 +90,21 @@ router.post(
 router.post(
   '/totp/disable',
   requireAuth,
-  requireAdmin,
   asyncHandler(async (req, res) => {
     try {
       res.json(await disableTotp(req.user, req.body?.code));
+    } catch (err) {
+      sendAuthError(res, err);
+    }
+  })
+);
+
+router.post(
+  '/password',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    try {
+      res.json(await changePassword(req.user, req.body?.currentPassword, req.body?.newPassword));
     } catch (err) {
       sendAuthError(res, err);
     }

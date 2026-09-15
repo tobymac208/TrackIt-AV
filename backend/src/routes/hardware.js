@@ -6,6 +6,7 @@ const { mapHardwareRow } = require('../hardwareMap');
 const { parseCsv } = require('../csvParser');
 const { normalizeMacAddress } = require('../macAddress');
 const { loadRoomIndex, loadOffices, resolveConferenceRoomLocation } = require('../roomMatcher');
+const { can } = require('../permissions');
 const {
   parseRoomIds,
   assertRoomsExist,
@@ -382,8 +383,8 @@ router.get(
   '/:id',
   asyncHandler(async (req, res) => {
     const { revealPassword } = req.query;
-    if (revealPassword === 'true' && req.user?.role !== 'admin') {
-      return res.status(403).json({ error: 'View-only users cannot reveal passwords' });
+    if (revealPassword === 'true' && !can(req.user, 'hardware', 'write')) {
+      return res.status(403).json({ error: 'You do not have permission to reveal passwords' });
     }
     const row = await db.prepare(buildHardwareQuery('WHERE h.id = ?')).get(req.params.id);
     if (!row) {

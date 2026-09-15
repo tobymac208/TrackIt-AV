@@ -46,6 +46,15 @@ export const api = {
   setupTotp: () => request('/auth/totp/setup', { method: 'POST' }),
   enableTotp: (code) => request('/auth/totp/enable', { method: 'POST', body: JSON.stringify({ code }) }),
   disableTotp: (code) => request('/auth/totp/disable', { method: 'POST', body: JSON.stringify({ code }) }),
+  changePassword: (currentPassword, newPassword) =>
+    request('/auth/password', {
+      method: 'POST',
+      body: JSON.stringify({ currentPassword, newPassword }),
+    }),
+  getUsers: () => request('/users'),
+  createUser: (body) => request('/users', { method: 'POST', body: JSON.stringify(body) }),
+  updateUser: (id, body) => request(`/users/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  deleteUser: (id) => request(`/users/${id}`, { method: 'DELETE' }),
 
   getOffices: () => request('/offices'),
   getOffice: (id) => request(`/offices/${id}`),
