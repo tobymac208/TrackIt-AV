@@ -1,6 +1,6 @@
 # AV Hardware Lifecycle Tracker
 
-A single-user web application for tracking AV hardware across offices and conference rooms. Built with React (Vite) on the frontend and Node.js + Express on the backend. Local development uses SQLite; Cloud Run uses Cloud SQL (Postgres).
+A web application for tracking AV hardware across offices and conference rooms. Built with React (Vite) on the frontend and Node.js + Express on the backend. Local development uses SQLite.
 
 ## Features
 
@@ -46,12 +46,10 @@ Copy `backend/.env.example` to `backend/.env` and adjust as needed:
 
 | Variable | Description |
 |----------|-------------|
-| `PORT` | API server port (default: 3001, Cloud Run sets `8080`) |
+| `PORT` | API server port (default: 3001) |
 | `ENCRYPTION_KEY` | 64-character hex string (32 bytes) for password encryption |
-| `DATABASE_PATH` | Local SQLite file (used when no Postgres settings are present) |
-| `DATABASE_URL` | Optional Postgres URL (takes precedence) |
-| `DB_HOST` / `DB_PORT` / `DB_USER` / `DB_PASS` / `DB_NAME` | Postgres connection for Cloud SQL Auth Proxy or a local server |
-| `INSTANCE_CONNECTION_NAME` | Cloud Run unix socket: `PROJECT:REGION:INSTANCE` |
+| `DATABASE_PATH` | Local SQLite file (used when no Postgres URL is set) |
+| `DATABASE_URL` | Optional Postgres URL (takes precedence over SQLite) |
 
 Generate a new encryption key:
 
@@ -149,67 +147,16 @@ npm start
 
 When `frontend/dist` exists, Express serves the UI and `/api` from the same process.
 
-## Cloud Run + Cloud SQL
-
-The repo includes a `Dockerfile` and `cloudbuild.yaml`. The container builds the frontend and runs the API, which serves the UI and talks to Cloud SQL.
-
-### One-time GCP setup
-
-```bash
-gcloud config set project YOUR_PROJECT
-gcloud services enable run.googleapis.com artifactregistry.googleapis.com cloudbuild.googleapis.com sqladmin.googleapis.com secretmanager.googleapis.com
-
-gcloud artifacts repositories create avtracker --repository-format=docker --location=us-central1
-
-gcloud sql instances create avtracker-db --database-version=POSTGRES_16 --tier=db-f1-micro --region=us-central1
-gcloud sql databases create avtracker --instance=avtracker-db
-gcloud sql users set-password postgres --instance=avtracker-db --password=YOUR_DB_PASSWORD
-
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-# store that output:
-echo -n "YOUR_HEX_KEY" | gcloud secrets create encryption-key --data-file=-
-echo -n "YOUR_DB_PASSWORD" | gcloud secrets create db-pass --data-file=-
-```
-
-Grant the Cloud Run service account `roles/cloudsql.client` and Secret Manager accessor.
-
-### Copy local SQLite data into Cloud SQL
-
-Run the Cloud SQL Auth Proxy, then from `backend/`:
-
-```bash
-# cloud-sql-proxy YOUR_PROJECT:us-central1:avtracker-db
-set DB_HOST=127.0.0.1
-set DB_USER=postgres
-set DB_PASS=YOUR_DB_PASSWORD
-set DB_NAME=avtracker
-node src/migrateFromSqlite.js
-```
-
-Use the same `ENCRYPTION_KEY` as the local `.env` so existing device passwords still decrypt.
-
-### Deploy
-
-Edit `cloudbuild.yaml` substitutions (`_CLOUDSQL`, and project defaults), then:
-
-```bash
-gcloud builds submit --config cloudbuild.yaml --substitutions=_CLOUDSQL=YOUR_PROJECT:us-central1:avtracker-db
-```
-
-This app has no login. Put IAP (or another gate) in front before sharing the URL.
-
 ## Project Structure
 
 ```
 AVTracker/
-├── Dockerfile        # Cloud Run image (UI + API)
-├── cloudbuild.yaml
-├── backend/          # Express API (SQLite locally, Cloud SQL in prod)
+├── Dockerfile        # Production container (UI + API)
+├── backend/          # Express API (SQLite locally)
 │   ├── src/
 │   │   ├── index.js
 │   │   ├── db.js
 │   │   ├── crypto.js
-│   │   ├── migrateFromSqlite.js
 │   │   └── routes/
 │   └── data/         # SQLite database (gitignored)
 ├── scripts/
