@@ -16,7 +16,7 @@ export default function Layout({ children }) {
     <div className="app">
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <h1>AV Tracker</h1>
+          <h1>TrackIt! AV</h1>
           <p>Hardware Lifecycle</p>
         </div>
         <nav className="sidebar-nav">

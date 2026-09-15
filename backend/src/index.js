@@ -97,7 +97,7 @@ async function start() {
   await seedUsers();
   app.listen(PORT, '0.0.0.0', () => {
     const dialect = db.getDialect();
-    console.log(`AV Tracker API running on http://localhost:${PORT} (${dialect})`);
+    console.log(`TrackIt! AV API running on http://localhost:${PORT} (${dialect})`);
   });
 }
 

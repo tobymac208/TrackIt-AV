@@ -25,7 +25,7 @@ export default function Landing() {
   return (
     <div className="landing-page">
       <header className="landing-topbar">
-        <span className="landing-topbar-name">AV Tracker</span>
+        <span className="landing-topbar-name">TrackIt! AV</span>
         <Link to="/login" className="btn btn-primary">
           Login
         </Link>
@@ -33,9 +33,9 @@ export default function Landing() {
 
       <main className="landing-main">
         <section className="landing-hero">
-          <h1>AV Tracker</h1>
+          <h1>TrackIt! AV</h1>
           <p className="landing-lead">
-            Ryan Companies AV hardware lifecycle tracker. Inventory conference rooms, installed
+            A general-use AV hardware lifecycle tracker. Inventory conference rooms, installed
             devices, and shelf stock so replacements and emergency shipments are ready when a room
             goes down.
           </p>

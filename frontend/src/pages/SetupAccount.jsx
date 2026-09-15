@@ -60,7 +60,7 @@ export default function SetupAccount() {
         <div className="login-brand">
           <h1>Finish account setup</h1>
           <p>
-            Signed in as <strong>{user.username}</strong>. Complete the required steps to use AV Tracker.
+            Signed in as <strong>{user.username}</strong>. Complete the required steps to use TrackIt! AV
           </p>
         </div>
         {error && <div className="error-banner">{error}</div>}

@@ -9,7 +9,7 @@ const { can, permissionsFor, resourceFromRequest } = require('./permissions');
 
 const TOKEN_EXPIRES = '8h';
 const TOTP_CHALLENGE_EXPIRES = '5m';
-const TOTP_ISSUER = 'AV Tracker';
+const TOTP_ISSUER = 'TrackIt! AV';
 const TIMING_HASH = bcrypt.hashSync('avtracker-timing-placeholder', 10);
 
 function getSecret() {

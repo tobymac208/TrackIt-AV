@@ -46,7 +46,7 @@ export default function Login() {
       <div className="login-page">
         <form className="login-card" onSubmit={handleTotpSubmit}>
           <div className="login-brand">
-            <h1>AV Tracker</h1>
+            <h1>TrackIt! AV</h1>
             <p>Enter the 6-digit code from Google Authenticator</p>
           </div>
           {error && <div className="error-banner">{error}</div>}
@@ -92,7 +92,7 @@ export default function Login() {
           Back to home
         </Link>
         <div className="login-brand">
-          <h1>AV Tracker</h1>
+          <h1>TrackIt! AV</h1>
           <p>Sign in to view hardware inventory</p>
         </div>
         {error && <div className="error-banner">{error}</div>}
