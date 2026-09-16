@@ -5,7 +5,7 @@ const { generateSecret, generateURI, verify } = require('otplib');
 const db = require('./db');
 const { encrypt, decrypt } = require('./crypto');
 const { isLocked, recordFailure, clearFailures } = require('./loginGuard');
-const { can, permissionsFor, resourceFromRequest, isPrimaryAdmin } = require('./permissions');
+const { can, permissionsFor, resourceFromRequest, isPrimaryAdmin, isSharedAccount } = require('./permissions');
 
 const TOKEN_EXPIRES = '8h';
 const TOTP_CHALLENGE_EXPIRES = '5m';
@@ -33,6 +33,7 @@ function signTotpChallenge(user) {
 }
 
 function needsSetup(user) {
+  if (isSharedAccount(user)) return false;
   return (
     (Boolean(Number(user.must_setup_totp)) && !isTotpEnabled(user)) || Boolean(Number(user.must_change_password))
   );
@@ -49,6 +50,7 @@ function publicUser(user) {
     mustSetupTotp: Boolean(Number(user.must_setup_totp)) && !isTotpEnabled(user),
     disabled: Boolean(Number(user.disabled)),
     isPrimary: isPrimaryAdmin(user),
+    isShared: isSharedAccount(user),
     permissions: permissionsFor(user),
     setupOnly: needsSetup(user),
   };
@@ -116,6 +118,22 @@ async function seedUsers() {
     .prepare('INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)')
     .run('user', bcrypt.hashSync(userPassword, 10), 'user');
   console.log('Seeded admin and user accounts');
+}
+
+async function lockSharedAccount() {
+  await db
+    .prepare(
+      `
+      UPDATE users SET
+        totp_secret = NULL,
+        totp_enabled = 0,
+        must_setup_totp = 0,
+        mfa_required = 0,
+        must_change_password = 0
+      WHERE lower(username) = 'user'
+    `
+    )
+    .run();
 }
 
 function requireAuth(req, res, next) {
@@ -186,6 +204,9 @@ async function login(username, password) {
   if (!user || Number(user.disabled) || !bcrypt.compareSync(password || '', passwordHash)) {
     return null;
   }
+  if (isSharedAccount(user)) {
+    return finishLogin(user);
+  }
   if (isTotpEnabled(user)) {
     return { requiresTotp: true, challengeToken: signTotpChallenge(user) };
   }
@@ -233,6 +254,9 @@ async function getTotpStatus(userId) {
 }
 
 async function startTotpSetup(user) {
+  if (isSharedAccount(user)) {
+    throw Object.assign(new Error('This is a shared account, so MFA has been disabled'), { status: 403 });
+  }
   const current = await db.prepare('SELECT totp_enabled FROM users WHERE id = ?').get(user.id);
   if (Number(current?.totp_enabled)) {
     throw Object.assign(new Error('Authenticator sign-in is already enabled'), { status: 400 });
@@ -251,6 +275,9 @@ async function startTotpSetup(user) {
 }
 
 async function enableTotp(user, code) {
+  if (isSharedAccount(user)) {
+    throw Object.assign(new Error('This is a shared account, so MFA has been disabled'), { status: 403 });
+  }
   const row = await db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
   if (!row?.totp_secret) {
     throw Object.assign(new Error('Start authenticator setup first'), { status: 400 });
@@ -270,6 +297,11 @@ async function enableTotp(user, code) {
 }
 
 async function changePassword(user, currentPassword, newPassword) {
+  if (isSharedAccount(user)) {
+    throw Object.assign(new Error('Please contact the administrator to reset the password for this account'), {
+      status: 403,
+    });
+  }
   const row = await db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
   if (!row) {
     throw Object.assign(new Error('User not found'), { status: 404 });
@@ -292,6 +324,9 @@ async function changePassword(user, currentPassword, newPassword) {
 }
 
 async function disableTotp(user, code) {
+  if (isSharedAccount(user)) {
+    throw Object.assign(new Error('This is a shared account, so MFA has been disabled'), { status: 403 });
+  }
   const row = await db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
   if (!isTotpEnabled(row)) {
     throw Object.assign(new Error('Authenticator sign-in is not enabled'), { status: 400 });
@@ -311,6 +346,7 @@ async function disableTotp(user, code) {
 
 module.exports = {
   seedUsers,
+  lockSharedAccount,
   requireAuth,
   requireAdmin,
   requireRead,

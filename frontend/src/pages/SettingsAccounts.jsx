@@ -4,7 +4,7 @@ import { useAuth } from '../auth';
 import AccountsPanel from '../components/AccountsPanel';
 
 export default function SettingsAccounts() {
-  const { isAdmin, applyAuthResult } = useAuth();
+  const { user, isAdmin, applyAuthResult } = useAuth();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -41,6 +41,11 @@ export default function SettingsAccounts() {
         <div className="settings-section">
           {error && <div className="error-banner">{error}</div>}
           {message && <div className="success-banner">{message}</div>}
+          {user?.isShared ? (
+            <p className="settings-intro">
+              Please contact the administrator to reset the password for this account.
+            </p>
+          ) : (
           <form onSubmit={savePassword} className="totp-form">
             <div className="form-field">
               <label htmlFor="current-password" className="required">
@@ -87,6 +92,7 @@ export default function SettingsAccounts() {
               {busy ? 'Saving...' : 'Update password'}
             </button>
           </form>
+          )}
         </div>
       </div>
       {isAdmin && <AccountsPanel />}

@@ -72,13 +72,17 @@ export default function SettingsMfa() {
     <div className="panel">
       <div className="panel-header">Google Authenticator</div>
       <div className="settings-section">
-        <p className="settings-intro">
-          After you turn this on, signing in requires your password and a 6-digit code from Google Authenticator.
-        </p>
+        {user?.isShared ? (
+          <p className="settings-intro">This is a shared account, so MFA has been disabled.</p>
+        ) : (
+          <p className="settings-intro">
+            After you turn this on, signing in requires your password and a 6-digit code from Google Authenticator.
+          </p>
+        )}
         {error && <div className="error-banner">{error}</div>}
         {message && <div className="success-banner">{message}</div>}
 
-        {totpEnabled && !setup ? (
+        {user?.isShared ? null : totpEnabled && !setup ? (
           <form onSubmit={disableTotp} className="totp-form">
             <p>Authenticator sign-in is on for this account.</p>
             {user?.mfaRequired && (

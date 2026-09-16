@@ -1,9 +1,14 @@
 const RESOURCES = ['offices', 'rooms', 'hardware', 'inventory'];
 const MAX_ADMINS = 3;
 const PRIMARY_ADMIN_USERNAME = 'admin';
+const SHARED_USER_USERNAME = 'user';
 
 function isPrimaryAdmin(user) {
   return String(user?.username || '').toLowerCase() === PRIMARY_ADMIN_USERNAME;
+}
+
+function isSharedAccount(user) {
+  return String(user?.username || '').toLowerCase() === SHARED_USER_USERNAME;
 }
 
 const ALL_ACCESS = Object.fromEntries(RESOURCES.map((resource) => [resource, { read: true, write: true }]));
@@ -60,9 +65,11 @@ module.exports = {
   RESOURCES,
   MAX_ADMINS,
   PRIMARY_ADMIN_USERNAME,
+  SHARED_USER_USERNAME,
   ALL_ACCESS,
   VIEW_ONLY,
   isPrimaryAdmin,
+  isSharedAccount,
   normalizePermissions,
   permissionsFor,
   can,

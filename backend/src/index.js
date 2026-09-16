@@ -8,7 +8,7 @@ const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 
 const db = require('./db');
-const { seedUsers, requireAuth, requireAdmin, requireRead, requireWriteAdmin } = require('./auth');
+const { seedUsers, lockSharedAccount, requireAuth, requireAdmin, requireRead, requireWriteAdmin } = require('./auth');
 
 const authRouter = require('./routes/auth');
 const officesRouter = require('./routes/offices');
@@ -95,6 +95,7 @@ async function start() {
     throw new Error('AUTH_SECRET must be set to a string of at least 32 characters');
   }
   await seedUsers();
+  await lockSharedAccount();
   app.listen(PORT, '0.0.0.0', () => {
     const dialect = db.getDialect();
     console.log(`TrackIt! AV API running on http://localhost:${PORT} (${dialect})`);
