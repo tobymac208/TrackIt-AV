@@ -184,10 +184,10 @@ export default function Hardware() {
       <div className="filters">
         <input
           type="search"
+          className="filters-search"
           placeholder="Search device name, serial, IP, location..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          style={{ minWidth: '260px' }}
         />
         <label htmlFor="importance-filter">Importance:</label>
         <select id="importance-filter" value={importanceFilter} onChange={(e) => setImportanceFilter(e.target.value)}>

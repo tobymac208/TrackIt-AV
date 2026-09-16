@@ -156,6 +156,24 @@ body {
   flex-direction: column;
 }
 
+.sidebar-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.sidebar-menus {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.nav-toggle {
+  display: none;
+}
+
 .sidebar-brand h1 {
   margin: 0;
   font-size: 1.25rem;
@@ -717,6 +735,11 @@ tr.eos-past td {
   color: var(--text-muted);
 }
 
+.filters-search {
+  min-width: 260px;
+  flex: 1;
+}
+
 input,
 select,
 textarea {
@@ -930,6 +953,7 @@ textarea {
   display: inline-flex;
   align-items: center;
   gap: 0.375rem;
+  min-height: 44px;
   color: var(--text-muted);
   text-decoration: none;
   font-size: 0.875rem;
@@ -1227,6 +1251,14 @@ textarea {
   border: 1px solid var(--border);
   border-radius: 10px;
   overflow: hidden;
+  transition: transform 0.25s ease;
+}
+
+@media (hover: hover) {
+  .landing-example:hover {
+    transform: scale(1.06);
+    z-index: 1;
+  }
 }
 
 .landing-example img {
@@ -1250,6 +1282,39 @@ textarea {
   font-size: 0.9rem;
 }
 
+.landing-request {
+  margin-top: 2.5rem;
+  padding: 1.5rem 1.5rem 1.75rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.landing-request h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.35rem;
+}
+
+.landing-request > p {
+  margin: 0 0 1.25rem;
+  color: var(--text-muted);
+}
+
+.landing-request-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  align-items: end;
+}
+
+.landing-request-details {
+  grid-column: 1 / -1;
+}
+
+.landing-request-form .btn {
+  justify-self: start;
+}
+
 .landing-footer {
   padding: 1.25rem 1.5rem 1.75rem;
   text-align: center;
@@ -1262,7 +1327,9 @@ textarea {
 }
 
 .login-home-link {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
   margin-bottom: 0.25rem;
   color: var(--text-muted);
   text-decoration: none;
@@ -1280,8 +1347,14 @@ textarea {
 
   .sidebar {
     width: 100%;
-    padding: 1rem;
+    padding: 0.75rem 1rem;
+    padding-top: max(0.75rem, env(safe-area-inset-top));
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
     border-right: none;
+    position: sticky;
+    top: 0;
+    z-index: 20;
   }
 
   [data-theme='cod'] .sidebar {
@@ -1289,21 +1362,114 @@ textarea {
     border-bottom: 3px solid var(--primary);
   }
 
+  .sidebar-brand p {
+    margin-bottom: 0;
+  }
+
+  .nav-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    min-width: 44px;
+    padding: 0.5rem 0.85rem;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 8px;
+    background: var(--sidebar-hover);
+    color: var(--sidebar-active);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .sidebar-menus {
+    display: none;
+    flex: none;
+    margin-top: 0.75rem;
+  }
+
+  .sidebar.is-open .sidebar-menus {
+    display: block;
+  }
+
   .sidebar-nav {
-    flex-direction: row;
-    flex-wrap: wrap;
+    flex-direction: column;
+    flex-wrap: nowrap;
+  }
+
+  .sidebar-nav .nav-link,
+  .nav-sign-out {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
   }
 
   .sidebar-nav-footer {
-    margin-top: 0;
-    padding-top: 0;
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
   }
 
   .main {
     padding: 1rem;
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
   }
 
   .form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .btn {
+    min-height: 44px;
+  }
+
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+    min-height: 44px;
+  }
+
+  .login-page {
+    min-height: 100dvh;
+    padding: 1.25rem;
+  }
+
+  .landing-hero h1 {
+    font-size: 1.75rem;
+  }
+
+  .landing-request-form {
+    grid-template-columns: 1fr;
+  }
+
+  .filters-search,
+  .filters select {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .actions {
+    flex-wrap: wrap;
+  }
+
+  .modal {
+    max-height: min(90dvh, 90vh);
+  }
+
+  .modal-footer {
+    flex-wrap: wrap;
+  }
+
+  .modal-close {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .qty-stepper .btn {
+    min-width: 44px;
+  }
+
+  .table-wrap {
+    -webkit-overflow-scrolling: touch;
   }
 }
