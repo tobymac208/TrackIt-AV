@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs');
 const db = require('../db');
 const asyncHandler = require('../asyncHandler');
 const { publicUser } = require('../auth');
-const { MAX_ADMINS, VIEW_ONLY, normalizePermissions } = require('../permissions');
+const { MAX_ADMINS, VIEW_ONLY, isPrimaryAdmin, normalizePermissions } = require('../permissions');
 
 const router = express.Router();
 
@@ -49,6 +49,10 @@ router.post(
     if (username.error) return res.status(400).json({ error: username.error });
     const password = validatePassword(req.body?.password);
     if (password.error) return res.status(400).json({ error: password.error });
+
+    if (isPrimaryAdmin({ username: username.value })) {
+      return res.status(400).json({ error: 'The primary administrator username is reserved' });
+    }
 
     const role = req.body?.role === 'admin' ? 'admin' : 'user';
     if (role === 'admin' && (await adminCount()) >= MAX_ADMINS) {
@@ -103,6 +107,10 @@ router.patch(
       return res.status(400).json({ error: 'Role must be admin or user' });
     }
 
+    if (isPrimaryAdmin(existing) && nextRole !== existing.role) {
+      return res.status(400).json({ error: 'The primary administrator cannot be changed to a custom user' });
+    }
+
     if (Number(req.params.id) === Number(req.user.id) && nextRole !== 'admin') {
       return res.status(400).json({ error: 'You cannot remove your own administrator access' });
     }
@@ -121,6 +129,9 @@ router.patch(
     let disabled = existing.disabled;
     if (req.body?.disabled !== undefined) {
       disabled = req.body.disabled ? 1 : 0;
+      if (isPrimaryAdmin(existing) && Number(disabled) !== Number(existing.disabled)) {
+        return res.status(400).json({ error: 'The primary administrator cannot be disabled' });
+      }
       if (Number(req.params.id) === Number(req.user.id) && disabled) {
         return res.status(400).json({ error: 'You cannot disable your own account' });
       }
@@ -181,6 +192,9 @@ router.delete(
     const existing = await db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
     if (!existing) {
       return res.status(404).json({ error: 'User not found' });
+    }
+    if (isPrimaryAdmin(existing)) {
+      return res.status(400).json({ error: 'The primary administrator cannot be deleted' });
     }
     if (Number(req.params.id) === Number(req.user.id)) {
       return res.status(400).json({ error: 'You cannot delete your own account' });

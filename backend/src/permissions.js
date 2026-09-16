@@ -1,5 +1,10 @@
 const RESOURCES = ['offices', 'rooms', 'hardware', 'inventory'];
 const MAX_ADMINS = 3;
+const PRIMARY_ADMIN_USERNAME = 'admin';
+
+function isPrimaryAdmin(user) {
+  return String(user?.username || '').toLowerCase() === PRIMARY_ADMIN_USERNAME;
+}
 
 const ALL_ACCESS = Object.fromEntries(RESOURCES.map((resource) => [resource, { read: true, write: true }]));
 const VIEW_ONLY = {
@@ -54,8 +59,10 @@ function resourceFromRequest(req) {
 module.exports = {
   RESOURCES,
   MAX_ADMINS,
+  PRIMARY_ADMIN_USERNAME,
   ALL_ACCESS,
   VIEW_ONLY,
+  isPrimaryAdmin,
   normalizePermissions,
   permissionsFor,
   can,

@@ -5,7 +5,7 @@ const { generateSecret, generateURI, verify } = require('otplib');
 const db = require('./db');
 const { encrypt, decrypt } = require('./crypto');
 const { isLocked, recordFailure, clearFailures } = require('./loginGuard');
-const { can, permissionsFor, resourceFromRequest } = require('./permissions');
+const { can, permissionsFor, resourceFromRequest, isPrimaryAdmin } = require('./permissions');
 
 const TOKEN_EXPIRES = '8h';
 const TOTP_CHALLENGE_EXPIRES = '5m';
@@ -48,6 +48,7 @@ function publicUser(user) {
     mustChangePassword: Boolean(Number(user.must_change_password)),
     mustSetupTotp: Boolean(Number(user.must_setup_totp)) && !isTotpEnabled(user),
     disabled: Boolean(Number(user.disabled)),
+    isPrimary: isPrimaryAdmin(user),
     permissions: permissionsFor(user),
     setupOnly: needsSetup(user),
   };

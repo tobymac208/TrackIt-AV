@@ -196,6 +196,9 @@ export default function AccountsPanel() {
                 <tr key={item.id}>
                   <td>
                     <strong>{item.username}</strong>
+                    {item.isPrimary && (
+                      <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Primary admin</div>
+                    )}
                     {item.id === user.id && (
                       <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>You</div>
                     )}
@@ -216,12 +219,12 @@ export default function AccountsPanel() {
                           Make admin
                         </button>
                       )}
-                      {item.role === 'admin' && item.id !== user.id && (
+                      {item.role === 'admin' && item.id !== user.id && !item.isPrimary && (
                         <button className="btn btn-secondary btn-sm" onClick={() => saveUser(item, { role: 'user' })}>
                           Make custom user
                         </button>
                       )}
-                      {item.id !== user.id && (
+                      {item.id !== user.id && !item.isPrimary && (
                         <button
                           className="btn btn-secondary btn-sm"
                           onClick={() => saveUser(item, { disabled: !item.disabled })}
@@ -253,7 +256,7 @@ export default function AccountsPanel() {
                           </button>
                         </div>
                       )}
-                      {item.id !== user.id && (
+                      {item.id !== user.id && !item.isPrimary && (
                         <button className="btn btn-danger btn-sm" onClick={() => removeUser(item)}>
                           Delete
                         </button>
