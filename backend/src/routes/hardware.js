@@ -20,29 +20,22 @@ const router = express.Router();
 
 const IMPORTANCE_LEVELS = ['low', 'medium', 'high', 'critical'];
 
-/** UTC YYYY-MM-DD for TEXT date columns (matches SQLite date('now') semantics). */
-function utcIsoDate(addDays = 0) {
-  const d = new Date();
-  d.setUTCDate(d.getUTCDate() + addDays);
-  return d.toISOString().slice(0, 10);
+/** Same rules as frontend isDateSoon / isDatePast — missing or invalid dates are ignored. */
+function matchesEosWithin90Days(row) {
+  const raw = row.end_of_support_date;
+  if (raw == null || String(raw).trim() === '') return false;
+  const target = new Date(raw);
+  if (Number.isNaN(target.getTime())) return false;
+  const diffDays = (target - new Date()) / (1000 * 60 * 60 * 24);
+  return diffDays >= 0 && diffDays <= 90;
 }
 
-function isoDatePrefix(value) {
-  if (value == null) return null;
-  const trimmed = String(value).trim();
-  if (!trimmed) return null;
-  const match = trimmed.match(/^(\d{4}-\d{2}-\d{2})/);
-  return match ? match[1] : null;
-}
-
-function matchesEosSoonRow(row, deadlineIso = utcIsoDate(90)) {
-  const iso = isoDatePrefix(row.end_of_support_date);
-  return Boolean(iso && iso <= deadlineIso);
-}
-
-function matchesWarrantyExpiredRow(row, todayIso = utcIsoDate(0)) {
-  const iso = isoDatePrefix(row.end_of_warranty_date);
-  return Boolean(iso && iso < todayIso);
+function matchesWarrantyExpired(row) {
+  const raw = row.end_of_warranty_date;
+  if (raw == null || String(raw).trim() === '') return false;
+  const target = new Date(raw);
+  if (Number.isNaN(target.getTime())) return false;
+  return target < new Date();
 }
 
 const insertHardwareStmt = db.prepare(`
@@ -398,11 +391,9 @@ router.get(
     let rows = await db.prepare(buildHardwareQuery(whereClause)).all(...params);
 
     if (filterEosSoon || filterWarrantyExpired) {
-      const eosDeadline = utcIsoDate(90);
-      const todayIso = utcIsoDate(0);
       rows = rows.filter((row) => {
-        if (filterEosSoon && !matchesEosSoonRow(row, eosDeadline)) return false;
-        if (filterWarrantyExpired && !matchesWarrantyExpiredRow(row, todayIso)) return false;
+        if (filterEosSoon && !matchesEosWithin90Days(row)) return false;
+        if (filterWarrantyExpired && !matchesWarrantyExpired(row)) return false;
         return true;
       });
     }
