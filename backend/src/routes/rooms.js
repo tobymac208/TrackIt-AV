@@ -3,6 +3,7 @@ const db = require('../db');
 const asyncHandler = require('../asyncHandler');
 const { mapHardwareRow } = require('../hardwareMap');
 const { syncPrimaryRoom, withRooms } = require('../hardwareRooms');
+const { JOB_SITE_OFFICE_NAME, buildJobSiteName } = require('../jobSite');
 
 const router = express.Router();
 
@@ -41,6 +42,51 @@ router.get(
     }
     const rooms = await db.prepare(getRoomQuery()).all();
     res.json(rooms);
+  })
+);
+
+async function ensureJobSitesOffice() {
+  const existing = await db.prepare('SELECT id FROM offices WHERE name = ?').get(JOB_SITE_OFFICE_NAME);
+  if (existing) return existing.id;
+  const created = await db.prepare('INSERT INTO offices (name) VALUES (?)').run(JOB_SITE_OFFICE_NAME);
+  return created.lastInsertRowid;
+}
+
+router.post(
+  '/job-sites',
+  asyncHandler(async (req, res) => {
+    const { state, roomName, status, issueDescription } = req.body;
+    const name = buildJobSiteName(state, roomName);
+    if (!name) {
+      return res.status(400).json({
+        error: 'State must be a valid 2-letter code and conference room name is required',
+      });
+    }
+
+    const roomStatus = normalizeRoomStatus(status);
+    if (status !== undefined && status !== null && status !== '' && !roomStatus) {
+      return res.status(400).json({ error: 'Status must be functional or issue' });
+    }
+
+    const issueText = normalizeIssueDescription(roomStatus || 'functional', issueDescription);
+    if ((roomStatus || 'functional') === 'issue' && !issueText) {
+      return res.status(400).json({ error: 'Issue description is required when status is Issue' });
+    }
+
+    const officeId = await ensureJobSitesOffice();
+
+    try {
+      const result = await db
+        .prepare('INSERT INTO conference_rooms (office_id, name, status, issue_description) VALUES (?, ?, ?, ?)')
+        .run(officeId, name, roomStatus || 'functional', issueText);
+      const room = await db.prepare(getRoomQuery('WHERE cr.id = ?')).get(result.lastInsertRowid);
+      res.status(201).json(room);
+    } catch (err) {
+      if (db.isUniqueViolation(err)) {
+        return res.status(409).json({ error: `Job site "${name}" already exists` });
+      }
+      throw err;
+    }
   })
 );
 

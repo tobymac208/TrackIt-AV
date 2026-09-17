@@ -66,6 +66,7 @@ export const api = {
   getRoom: (id) => request(`/rooms/${id}`),
   getRoomHardware: (id) => request(`/rooms/${id}/hardware`),
   createRoom: (body) => request('/rooms', { method: 'POST', body: JSON.stringify(body) }),
+  createJobSite: (body) => request('/rooms/job-sites', { method: 'POST', body: JSON.stringify(body) }),
   updateRoom: (id, body) => request(`/rooms/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   deleteRoom: (id) => request(`/rooms/${id}`, { method: 'DELETE' }),
 

@@ -5,6 +5,7 @@ import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Offices from './pages/Offices';
+import JobSites from './pages/JobSites';
 import Rooms from './pages/Rooms';
 import RoomDetail from './pages/RoomDetail';
 import Hardware from './pages/Hardware';
@@ -40,6 +41,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/offices" element={can('offices', 'read') ? <Offices /> : <Navigate to="/" replace />} />
+        <Route path="/jobsites" element={can('rooms', 'read') ? <JobSites /> : <Navigate to="/" replace />} />
         <Route path="/rooms" element={can('rooms', 'read') ? <Rooms /> : <Navigate to="/" replace />} />
         <Route path="/rooms/:id" element={can('rooms', 'read') ? <RoomDetail /> : <Navigate to="/" replace />} />
         <Route path="/hardware" element={can('hardware', 'read') ? <Hardware /> : <Navigate to="/" replace />} />

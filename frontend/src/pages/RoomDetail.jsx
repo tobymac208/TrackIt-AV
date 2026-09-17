@@ -7,6 +7,7 @@ import HardwareForm from '../components/HardwareForm';
 import ImportanceBadge, { formatDate, formatCost } from '../components/ImportanceBadge';
 import { getHardwareRowClass } from '../utils/replacementReview';
 import RoomStatusBadge from '../components/RoomStatusBadge';
+import { isJobSiteName } from '../utils/jobSite';
 
 export default function RoomDetail() {
   const { can } = useAuth();
@@ -68,8 +69,8 @@ export default function RoomDetail() {
 
   return (
     <div>
-      <Link to="/rooms" className="back-link">
-        &larr; Back to Rooms
+      <Link to={isJobSiteName(room.name) ? '/jobsites' : '/rooms'} className="back-link">
+        {isJobSiteName(room.name) ? '\u2190 Back to Job Sites' : '\u2190 Back to Rooms'}
       </Link>
 
       <div className="page-header">

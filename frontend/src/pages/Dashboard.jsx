@@ -11,6 +11,7 @@ import {
   buildReplacementReview,
 } from '../utils/replacementReview';
 import { formatHardwareLocation } from '../utils/hardwareSort';
+import { isJobSiteName } from '../utils/jobSite';
 
 export default function Dashboard() {
   const { can } = useAuth();
@@ -48,6 +49,8 @@ export default function Dashboard() {
   if (loading) return <div className="loading">Loading dashboard...</div>;
   if (error) return <div className="error-banner">{error}</div>;
 
+  const jobSites = rooms.filter((room) => isJobSiteName(room.name));
+  const officeRooms = rooms.filter((room) => !isJobSiteName(room.name));
   const unassigned = hardware.filter((h) => !(h.rooms?.length || h.conference_room_id)).length;
   const eosSoon = hardware.filter((h) => !h.recommended_replacement_date && isEosSoon(h.end_of_support_date));
   const eosPast = hardware.filter((h) => !h.recommended_replacement_date && isEosPast(h.end_of_support_date));
@@ -105,7 +108,11 @@ export default function Dashboard() {
         </div>
         <div className="stat-card">
           <div className="label">Conference Rooms</div>
-          <div className="value">{rooms.length}</div>
+          <div className="value">{officeRooms.length}</div>
+        </div>
+        <div className="stat-card">
+          <div className="label">Job Sites</div>
+          <div className="value">{jobSites.length}</div>
         </div>
         <div className="stat-card">
           <div className="label">Unassigned</div>
