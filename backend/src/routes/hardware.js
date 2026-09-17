@@ -5,7 +5,8 @@ const { encrypt } = require('../crypto');
 const { mapHardwareRow } = require('../hardwareMap');
 const { parseCsv } = require('../csvParser');
 const { normalizeMacAddress } = require('../macAddress');
-const { loadRoomIndex, loadOffices, resolveConferenceRoomLocation } = require('../roomMatcher');
+const { loadRoomIndex, loadOffices, resolveConferenceRoomLocation, roomNamesMatch } = require('../roomMatcher');
+const { ensureJobSiteRoom, jobSiteNameFromImportRow } = require('../jobSite');
 const { can } = require('../permissions');
 const {
   parseRoomIds,
@@ -132,6 +133,18 @@ async function insertHardwareRecord(data) {
     await setHardwareRooms(created.id, roomIds);
   }
   return withRooms(created, (row) => row);
+}
+
+async function findExistingImportedHardware(data) {
+  if (data.serialNumber) {
+    const bySerial = await db.prepare('SELECT id FROM hardware WHERE serial_number = ?').get(data.serialNumber);
+    if (bySerial) return bySerial;
+  }
+  if (data.macAddress) {
+    const byMac = await db.prepare('SELECT id FROM hardware WHERE mac_address = ?').get(data.macAddress);
+    if (byMac) return byMac;
+  }
+  return null;
 }
 
 function resolveImportLocation(row, offices, roomIndex, defaults) {
@@ -262,6 +275,16 @@ router.post(
     const warnings = [];
 
     for (const row of rows) {
+      const jobSiteName = jobSiteNameFromImportRow(row);
+      if (jobSiteName) {
+        try {
+          await ensureJobSiteRoom(db, jobSiteName, offices, roomIndex, roomNamesMatch);
+        } catch (err) {
+          failed.push({ line: row._line, errors: [err.message] });
+          continue;
+        }
+      }
+
       const { errors, warnings: rowWarnings, data } = validateImportRow(row, offices, roomIndex, defaults);
       if (errors.length) {
         failed.push({ line: row._line, errors });
@@ -273,6 +296,15 @@ router.post(
       });
 
       try {
+        const existing = await findExistingImportedHardware(data);
+        if (existing) {
+          if (data.conferenceRoomId) {
+            await setHardwareRooms(existing.id, [data.conferenceRoomId]);
+          }
+          const row = await db.prepare(buildHardwareQuery('WHERE h.id = ?')).get(existing.id);
+          imported.push(mapHardwareRow(await withRooms(row, (item) => item), false));
+          continue;
+        }
         const created = await insertHardwareRecord(data);
         imported.push(mapHardwareRow(created, false));
       } catch (err) {

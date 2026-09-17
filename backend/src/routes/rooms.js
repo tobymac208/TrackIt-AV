@@ -3,7 +3,7 @@ const db = require('../db');
 const asyncHandler = require('../asyncHandler');
 const { mapHardwareRow } = require('../hardwareMap');
 const { syncPrimaryRoom, withRooms } = require('../hardwareRooms');
-const { JOB_SITE_OFFICE_NAME, buildJobSiteName } = require('../jobSite');
+const { buildJobSiteName, ensureJobSitesOffice } = require('../jobSite');
 
 const router = express.Router();
 
@@ -45,13 +45,6 @@ router.get(
   })
 );
 
-async function ensureJobSitesOffice() {
-  const existing = await db.prepare('SELECT id FROM offices WHERE name = ?').get(JOB_SITE_OFFICE_NAME);
-  if (existing) return existing.id;
-  const created = await db.prepare('INSERT INTO offices (name) VALUES (?)').run(JOB_SITE_OFFICE_NAME);
-  return created.lastInsertRowid;
-}
-
 router.post(
   '/job-sites',
   asyncHandler(async (req, res) => {
@@ -59,7 +52,7 @@ router.post(
     const name = buildJobSiteName(state, roomName);
     if (!name) {
       return res.status(400).json({
-        error: 'State must be a valid 2-letter code and conference room name is required',
+        error: 'State or site code and conference room name are required',
       });
     }
 
@@ -73,7 +66,7 @@ router.post(
       return res.status(400).json({ error: 'Issue description is required when status is Issue' });
     }
 
-    const officeId = await ensureJobSitesOffice();
+    const officeId = await ensureJobSitesOffice(db);
 
     try {
       const result = await db

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { buildJobSiteName, parseJobSiteName, US_STATES } from '../utils/jobSite';
+import { buildJobSiteName, normalizeStateCode, parseJobSiteName, US_STATES } from '../utils/jobSite';
 
 const ROOM_STATUSES = [
   { value: 'functional', label: 'Functional' },
@@ -57,6 +57,9 @@ export default function JobSiteForm({ initial, onSubmit }) {
           </label>
           <select id="job-site-state" value={state} onChange={(e) => setState(e.target.value)}>
             <option value="">Select state...</option>
+            {state && !normalizeStateCode(state) && (
+              <option value={state}>{state}</option>
+            )}
             {US_STATES.map((entry) => (
               <option key={entry.code} value={entry.code}>
                 {entry.name} ({entry.code})

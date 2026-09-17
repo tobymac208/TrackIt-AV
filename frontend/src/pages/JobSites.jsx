@@ -96,7 +96,7 @@ export default function JobSites() {
                 <tr>
                   <th className="col-num">#</th>
                   <th>Room Name</th>
-                  <th>State</th>
+                  <th>Site Code</th>
                   <th>Site</th>
                   <th>Status</th>
                   <th>Hardware</th>

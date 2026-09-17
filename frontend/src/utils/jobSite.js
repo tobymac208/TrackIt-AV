@@ -56,13 +56,21 @@ export const US_STATES = [
 ];
 
 const STATE_CODES = new Set(US_STATES.map((state) => state.code));
-const JOB_SITE_PATTERN = /^Conf-JOB-([A-Za-z]{2})-(.+)$/;
+const JOB_SITE_PREFIX_PATTERN = /^conf-job[- ]/i;
+const JOB_SITE_PARSE_PATTERN = /^conf-job[- ]([A-Za-z0-9]+)(?:[- ](.+))?$/i;
 
 export function normalizeStateCode(value) {
   const code = String(value || '')
     .trim()
     .toUpperCase();
   return STATE_CODES.has(code) ? code : '';
+}
+
+export function normalizeSiteCode(value) {
+  return String(value || '')
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '');
 }
 
 export function normalizeJobSiteRoomName(value) {
@@ -72,26 +80,27 @@ export function normalizeJobSiteRoomName(value) {
 }
 
 export function buildJobSiteName(state, roomName) {
-  const stateCode = normalizeStateCode(state);
+  const stateCode = normalizeStateCode(state) || normalizeSiteCode(state);
   const siteName = normalizeJobSiteRoomName(roomName);
   if (!stateCode || !siteName) return '';
   return `${JOB_SITE_PREFIX}-${stateCode}-${siteName}`;
 }
 
 export function parseJobSiteName(name) {
-  const match = String(name || '').trim().match(JOB_SITE_PATTERN);
+  const match = String(name || '').trim().match(JOB_SITE_PARSE_PATTERN);
   if (!match) return null;
-  const state = normalizeStateCode(match[1]);
-  const roomName = normalizeJobSiteRoomName(match[2]);
+  const state = normalizeSiteCode(match[1]);
+  const roomName = (match[2] || '').trim();
   if (!state || !roomName) return null;
   return { state, roomName };
 }
 
 export function isJobSiteName(name) {
-  return Boolean(parseJobSiteName(name));
+  return JOB_SITE_PREFIX_PATTERN.test(String(name || '').trim());
 }
 
 export function stateLabel(code) {
-  const state = US_STATES.find((entry) => entry.code === normalizeStateCode(code));
-  return state ? `${state.name} (${state.code})` : code || '—';
+  const normalized = normalizeSiteCode(code);
+  const state = US_STATES.find((entry) => entry.code === normalizeStateCode(normalized));
+  return state ? `${state.name} (${state.code})` : normalized || '—';
 }
