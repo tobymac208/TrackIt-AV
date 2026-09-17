@@ -23,14 +23,14 @@ const IMPORTANCE_LEVELS = ['low', 'medium', 'high', 'critical'];
 const ISO_DATE_PATTERN = '^[0-9]{4}-[0-9]{2}-[0-9]{2}$';
 
 function eosSoonCondition() {
-  if (db.usePostgres()) {
+  if (db.getDialect() === 'postgres') {
     return `(h.end_of_support_date IS NOT NULL AND btrim(h.end_of_support_date) <> '' AND h.end_of_support_date ~ '${ISO_DATE_PATTERN}' AND h.end_of_support_date <= to_char(CURRENT_DATE + 90, 'YYYY-MM-DD'))`;
   }
   return "(h.end_of_support_date IS NOT NULL AND h.end_of_support_date <> '' AND h.end_of_support_date <= date('now', '+90 days'))";
 }
 
 function warrantyExpiredCondition() {
-  if (db.usePostgres()) {
+  if (db.getDialect() === 'postgres') {
     return `(h.end_of_warranty_date IS NOT NULL AND btrim(h.end_of_warranty_date) <> '' AND h.end_of_warranty_date ~ '${ISO_DATE_PATTERN}' AND h.end_of_warranty_date < to_char(CURRENT_DATE, 'YYYY-MM-DD'))`;
   }
   return "(h.end_of_warranty_date IS NOT NULL AND h.end_of_warranty_date <> '' AND h.end_of_warranty_date < date('now'))";

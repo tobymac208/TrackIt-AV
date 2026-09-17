@@ -162,8 +162,9 @@ function toPostgresSql(sql) {
   let n = 0;
   return sql
     .replace(/datetime\('now'\)/gi, "TO_CHAR(NOW(), 'YYYY-MM-DD HH24:MI:SS')")
-    .replace(/date\('now',\s*'\+90 days'\)/gi, "(CURRENT_DATE + INTERVAL '90 days')")
-    .replace(/date\('now'\)/gi, 'CURRENT_DATE')
+    // Hardware EOS/warranty columns are TEXT; compare as YYYY-MM-DD strings, not timestamps.
+    .replace(/date\('now',\s*'\+90 days'\)/gi, "to_char((CURRENT_DATE + INTERVAL '90 days')::date, 'YYYY-MM-DD')")
+    .replace(/date\('now'\)/gi, "to_char(CURRENT_DATE, 'YYYY-MM-DD')")
     .replace(/\?/g, () => `$${++n}`);
 }
 
