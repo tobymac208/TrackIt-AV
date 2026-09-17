@@ -27,6 +27,24 @@ function utcIsoDate(addDays = 0) {
   return d.toISOString().slice(0, 10);
 }
 
+function isoDatePrefix(value) {
+  if (value == null) return null;
+  const trimmed = String(value).trim();
+  if (!trimmed) return null;
+  const match = trimmed.match(/^(\d{4}-\d{2}-\d{2})/);
+  return match ? match[1] : null;
+}
+
+function matchesEosSoonRow(row, deadlineIso = utcIsoDate(90)) {
+  const iso = isoDatePrefix(row.end_of_support_date);
+  return Boolean(iso && iso <= deadlineIso);
+}
+
+function matchesWarrantyExpiredRow(row, todayIso = utcIsoDate(0)) {
+  const iso = isoDatePrefix(row.end_of_warranty_date);
+  return Boolean(iso && iso < todayIso);
+}
+
 const insertHardwareStmt = db.prepare(`
   INSERT INTO hardware (
     conference_room_id, manufacturer, model, description, estimated_replacement_cost,
@@ -363,6 +381,8 @@ router.get(
   '/',
   asyncHandler(async (req, res) => {
     const { importance, unassigned, eosSoon, warrantyExpired } = req.query;
+    const filterEosSoon = eosSoon === 'true';
+    const filterWarrantyExpired = warrantyExpired === 'true';
     const conditions = [];
     const params = [];
 
@@ -373,21 +393,20 @@ router.get(
     if (unassigned === 'true') {
       conditions.push('NOT EXISTS (SELECT 1 FROM hardware_rooms hr WHERE hr.hardware_id = h.id)');
     }
-    if (eosSoon === 'true') {
-      conditions.push(
-        "(h.end_of_support_date IS NOT NULL AND h.end_of_support_date <> '' AND h.end_of_support_date <= ?)"
-      );
-      params.push(utcIsoDate(90));
-    }
-    if (warrantyExpired === 'true') {
-      conditions.push(
-        "(h.end_of_warranty_date IS NOT NULL AND h.end_of_warranty_date <> '' AND h.end_of_warranty_date < ?)"
-      );
-      params.push(utcIsoDate(0));
-    }
 
     const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
-    const rows = await db.prepare(buildHardwareQuery(whereClause)).all(...params);
+    let rows = await db.prepare(buildHardwareQuery(whereClause)).all(...params);
+
+    if (filterEosSoon || filterWarrantyExpired) {
+      const eosDeadline = utcIsoDate(90);
+      const todayIso = utcIsoDate(0);
+      rows = rows.filter((row) => {
+        if (filterEosSoon && !matchesEosSoonRow(row, eosDeadline)) return false;
+        if (filterWarrantyExpired && !matchesWarrantyExpiredRow(row, todayIso)) return false;
+        return true;
+      });
+    }
+
     res.json(await withRooms(rows, (row) => mapHardwareRow(row)));
   })
 );

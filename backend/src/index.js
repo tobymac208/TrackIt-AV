@@ -59,7 +59,10 @@ const loginLimiter = rateLimit({
 app.get('/api/health', async (_req, res) => {
   try {
     await db.prepare('SELECT 1 AS ok').get();
-    res.json({ status: 'ok' });
+    res.json({
+      status: 'ok',
+      commit: process.env.RAILWAY_GIT_COMMIT_SHA || process.env.GIT_COMMIT || null,
+    });
   } catch (err) {
     console.error(err);
     res.status(503).json({ status: 'error' });
