@@ -37,6 +37,7 @@ const SORT_ACCESSORS = {
   serial: (item) => textValue(item.serial_number),
   eos: (item) => dateValue(item.end_of_support_date),
   warranty: (item) => dateValue(item.end_of_warranty_date),
+  recommended: (item) => dateValue(item.recommended_replacement_date),
   cost: (item) => item.estimated_replacement_cost ?? null,
 };
 
@@ -70,5 +71,6 @@ export const HARDWARE_SORT_COLUMNS = [
   { key: 'serial', label: 'Serial #' },
   { key: 'eos', label: 'EOS Date' },
   { key: 'warranty', label: 'Warranty' },
+  { key: 'recommended', label: 'Replace By' },
   { key: 'cost', label: 'Est. Cost' },
 ];

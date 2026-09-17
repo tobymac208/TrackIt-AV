@@ -116,6 +116,7 @@ Optional columns:
 | `importance_level` | `low`, `medium`, `high`, or `critical` (defaults to `medium`) |
 | `end_of_support_date` | Date in `YYYY-MM-DD` format |
 | `end_of_warranty_date` | Warranty expiration in `YYYY-MM-DD` format |
+| `recommended_replacement_date` | Manufacturer replace-by date in `YYYY-MM-DD` format. When set, this overrides EOS and warranty for upgrade priority |
 | `upgrade_recommendations` | Upgrade notes |
 | `office` | Office name (use with `room` to disambiguate duplicate room names) |
 | `room` | Room name (matched on its own, or with `office`) |

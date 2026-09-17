@@ -42,8 +42,9 @@ const insertHardwareStmt = db.prepare(`
   INSERT INTO hardware (
     conference_room_id, manufacturer, model, description, estimated_replacement_cost,
     mac_address, ip_address, serial_number, software_version, username, password_encrypted,
-    importance_level, end_of_support_date, end_of_warranty_date, upgrade_recommendations
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    importance_level, end_of_support_date, end_of_warranty_date, recommended_replacement_date,
+    upgrade_recommendations
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `);
 
 function buildHardwareQuery(whereClause = '') {
@@ -122,6 +123,7 @@ async function insertHardwareRecord(data) {
     data.importanceLevel,
     data.endOfSupportDate || null,
     data.endOfWarrantyDate || null,
+    data.recommendedReplacementDate || null,
     data.upgradeRecommendations || null
   );
 
@@ -183,6 +185,11 @@ function validateImportRow(row, offices, roomIndex, defaults = {}) {
     errors.push('End of warranty date must be YYYY-MM-DD or a valid date');
   }
 
+  const recommendedReplacementDate = normalizeDate(row.recommendedReplacementDate);
+  if (row.recommendedReplacementDate && !recommendedReplacementDate) {
+    errors.push('Recommended replacement date must be YYYY-MM-DD or a valid date');
+  }
+
   const roomResult = resolveImportLocation(row, offices, roomIndex, defaults);
   const warnings = [...(roomResult.warnings || [])];
 
@@ -205,6 +212,7 @@ function validateImportRow(row, offices, roomIndex, defaults = {}) {
           importanceLevel,
           endOfSupportDate,
           endOfWarrantyDate,
+          recommendedReplacementDate,
           upgradeRecommendations: row.upgradeRecommendations || null,
           conferenceRoomId: roomResult.conferenceRoomId ?? null,
         },
@@ -328,6 +336,19 @@ router.patch('/bulk-update', asyncHandler(async (req, res) => {
     }
   }
 
+  if (updates.recommendedReplacementDate !== undefined) {
+    if (updates.recommendedReplacementDate === null) {
+      setClauses.push('recommended_replacement_date = NULL');
+    } else {
+      const date = normalizeDate(updates.recommendedReplacementDate);
+      if (!date) {
+        return res.status(400).json({ error: 'Recommended replacement date must be YYYY-MM-DD or a valid date' });
+      }
+      setClauses.push('recommended_replacement_date = ?');
+      values.push(date);
+    }
+  }
+
   if (updates.upgradeRecommendations !== undefined) {
     setClauses.push('upgrade_recommendations = ?');
     values.push(updates.upgradeRecommendations || null);
@@ -439,6 +460,7 @@ router.post(
     importanceLevel,
     endOfSupportDate,
     endOfWarrantyDate,
+    recommendedReplacementDate,
     upgradeRecommendations,
   } = req.body;
 
@@ -464,6 +486,7 @@ router.post(
     importanceLevel,
     endOfSupportDate,
     endOfWarrantyDate,
+    recommendedReplacementDate,
     upgradeRecommendations,
     conferenceRoomIds: roomIds,
   });
@@ -498,6 +521,7 @@ router.put(
     importanceLevel = existing.importance_level,
     endOfSupportDate = existing.end_of_support_date,
     endOfWarrantyDate = existing.end_of_warranty_date,
+    recommendedReplacementDate = existing.recommended_replacement_date,
     upgradeRecommendations = existing.upgrade_recommendations,
   } = req.body;
 
@@ -535,6 +559,7 @@ router.put(
       importance_level = ?,
       end_of_support_date = ?,
       end_of_warranty_date = ?,
+      recommended_replacement_date = ?,
       upgrade_recommendations = ?,
       updated_at = datetime('now')
     WHERE id = ?
@@ -554,6 +579,7 @@ router.put(
       importanceLevel,
       endOfSupportDate || null,
       endOfWarrantyDate || null,
+      recommendedReplacementDate || null,
       upgradeRecommendations || null,
       req.params.id
     );

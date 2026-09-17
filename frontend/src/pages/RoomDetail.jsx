@@ -5,6 +5,7 @@ import { useAuth } from '../auth';
 import Modal from '../components/Modal';
 import HardwareForm from '../components/HardwareForm';
 import ImportanceBadge, { formatDate, formatCost } from '../components/ImportanceBadge';
+import { getHardwareRowClass } from '../utils/replacementReview';
 import RoomStatusBadge from '../components/RoomStatusBadge';
 
 export default function RoomDetail() {
@@ -127,13 +128,14 @@ export default function RoomDetail() {
                   <th>Serial #</th>
                   <th>EOS Date</th>
                   <th>Warranty</th>
+                  <th>Replace By</th>
                   <th>Est. Cost</th>
                   {canWrite && <th>Actions</th>}
                 </tr>
               </thead>
               <tbody>
                 {hardware.map((item) => (
-                  <tr key={item.id}>
+                  <tr key={item.id} className={getHardwareRowClass(item)}>
                     <td>
                       <strong>
                         {item.manufacturer} {item.model}
@@ -149,6 +151,7 @@ export default function RoomDetail() {
                     <td>{item.serial_number || '—'}</td>
                     <td>{formatDate(item.end_of_support_date)}</td>
                     <td>{formatDate(item.end_of_warranty_date)}</td>
+                    <td>{formatDate(item.recommended_replacement_date)}</td>
                     <td>{formatCost(item.estimated_replacement_cost)}</td>
                     {canWrite && (
                       <td>

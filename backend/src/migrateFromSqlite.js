@@ -104,9 +104,9 @@ async function main() {
         `INSERT INTO hardware (
           id, conference_room_id, manufacturer, model, description, estimated_replacement_cost,
           mac_address, ip_address, serial_number, software_version, username, password_encrypted,
-          importance_level, end_of_support_date, end_of_warranty_date, upgrade_recommendations,
+          importance_level, end_of_support_date, end_of_warranty_date, recommended_replacement_date, upgrade_recommendations,
           created_at, updated_at
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
         [
           row.id,
           row.conference_room_id,
@@ -123,6 +123,7 @@ async function main() {
           row.importance_level,
           row.end_of_support_date,
           row.end_of_warranty_date,
+          row.recommended_replacement_date,
           row.upgrade_recommendations,
           row.created_at,
           row.updated_at,

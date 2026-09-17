@@ -17,6 +17,7 @@ const emptyForm = {
   importanceLevel: 'medium',
   endOfSupportDate: '',
   endOfWarrantyDate: '',
+  recommendedReplacementDate: '',
   upgradeRecommendations: '',
   conferenceRoomIds: [],
 };
@@ -39,6 +40,7 @@ export default function HardwareForm({ initial, rooms = [], onSubmit }) {
           importanceLevel: initial.importance_level || 'medium',
           endOfSupportDate: initial.end_of_support_date || '',
           endOfWarrantyDate: initial.end_of_warranty_date || '',
+          recommendedReplacementDate: initial.recommended_replacement_date || '',
           upgradeRecommendations: initial.upgrade_recommendations || '',
           conferenceRoomIds: initial.rooms?.length
             ? initial.rooms.map((room) => room.id)
@@ -84,6 +86,7 @@ export default function HardwareForm({ initial, rooms = [], onSubmit }) {
         importanceLevel: form.importanceLevel,
         endOfSupportDate: form.endOfSupportDate || null,
         endOfWarrantyDate: form.endOfWarrantyDate || null,
+        recommendedReplacementDate: form.recommendedReplacementDate || null,
         upgradeRecommendations: form.upgradeRecommendations || null,
         ...(rooms.length > 0 ? { conferenceRoomIds: form.conferenceRoomIds } : {}),
       });
@@ -158,6 +161,13 @@ export default function HardwareForm({ initial, rooms = [], onSubmit }) {
         <div className="form-field">
           <label>End of Warranty Date</label>
           <input type="date" value={form.endOfWarrantyDate} onChange={set('endOfWarrantyDate')} />
+        </div>
+        <div className="form-field">
+          <label>Recommended Replacement Date</label>
+          <input type="date" value={form.recommendedReplacementDate} onChange={set('recommendedReplacementDate')} />
+          <p className="room-checklist-hint">
+            Optional manufacturer replace-by date. When set, this overrides EOS and warranty for upgrade priority.
+          </p>
         </div>
         {rooms.length > 0 && (
           <div className="form-field full-width">

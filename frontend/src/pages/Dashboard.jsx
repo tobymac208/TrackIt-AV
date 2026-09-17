@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../auth';
-import ImportanceBadge, { formatDate, formatCost, isEosSoon, isEosPast, isWarrantyPast } from '../components/ImportanceBadge';
+import ImportanceBadge, { formatDate, formatCost, isDatePast, isDateSoon, isEosSoon, isEosPast, isWarrantyPast } from '../components/ImportanceBadge';
 import Pagination from '../components/Pagination';
 import { getPagination } from '../utils/pagination';
 import {
@@ -49,9 +49,11 @@ export default function Dashboard() {
   if (error) return <div className="error-banner">{error}</div>;
 
   const unassigned = hardware.filter((h) => !(h.rooms?.length || h.conference_room_id)).length;
-  const eosSoon = hardware.filter((h) => isEosSoon(h.end_of_support_date));
-  const eosPast = hardware.filter((h) => isEosPast(h.end_of_support_date));
-  const warrantyExpired = hardware.filter((h) => isWarrantyPast(h.end_of_warranty_date));
+  const eosSoon = hardware.filter((h) => !h.recommended_replacement_date && isEosSoon(h.end_of_support_date));
+  const eosPast = hardware.filter((h) => !h.recommended_replacement_date && isEosPast(h.end_of_support_date));
+  const warrantyExpired = hardware.filter((h) => !h.recommended_replacement_date && isWarrantyPast(h.end_of_warranty_date));
+  const recommendedPast = hardware.filter((h) => isDatePast(h.recommended_replacement_date));
+  const recommendedSoon = hardware.filter((h) => isDateSoon(h.recommended_replacement_date));
 
   const byImportance = {
     critical: hardware.filter((h) => h.importance_level === 'critical').length,
@@ -127,6 +129,18 @@ export default function Dashboard() {
             {warrantyExpired.length}
           </div>
         </div>
+        <div className="stat-card">
+          <div className="label">Replace By Within 90 Days</div>
+          <div className="value" style={{ color: recommendedSoon.length ? 'var(--medium)' : undefined }}>
+            {recommendedSoon.length}
+          </div>
+        </div>
+        <div className="stat-card">
+          <div className="label">Past Recommended Replacement</div>
+          <div className="value" style={{ color: recommendedPast.length ? 'var(--danger)' : undefined }}>
+            {recommendedPast.length}
+          </div>
+        </div>
       </div>
 
       <div className="panel replacement-review-panel">
@@ -147,8 +161,9 @@ export default function Dashboard() {
         <div className="replacement-review-intro">
           <p>
             Presentation view for <strong>Critical</strong> and <strong>High</strong> importance hardware.
-            Priority items are past EOS, EOS within 90 days, out of warranty (Critical/High), or have a
-            replacement recommendation on file.
+            Priority items are past recommended replacement, recommended replacement within 90 days, past EOS,
+            EOS within 90 days, out of warranty (Critical/High), or have a replacement recommendation on file.
+            A manufacturer recommended replacement date overrides EOS and warranty.
           </p>
           <div className="criteria-grid">
             {Object.entries(REPLACEMENT_CRITERIA).map(([level, text]) => (
@@ -225,6 +240,7 @@ export default function Dashboard() {
                       <th>Status</th>
                       <th>EOS Date</th>
                       <th>Warranty</th>
+                      <th>Replace By</th>
                       <th>Recommendation</th>
                       <th>Est. Cost</th>
                       <th>Lead Time</th>
@@ -246,6 +262,7 @@ export default function Dashboard() {
                         <td>{item.replacementStatus.label}</td>
                         <td>{formatDate(item.end_of_support_date)}</td>
                         <td>{formatDate(item.end_of_warranty_date)}</td>
+                        <td>{formatDate(item.recommended_replacement_date)}</td>
                         <td style={{ maxWidth: '280px' }}>{item.recommendation}</td>
                         <td>{formatCost(item.estimated_replacement_cost)}</td>
                         <td>{REPLACEMENT_LEAD_TIME}</td>

@@ -1,4 +1,4 @@
-import { isEosPast, isEosSoon, isWarrantyPast } from '../components/ImportanceBadge';
+import { formatDate, isDatePast, isDateSoon, isEosPast, isEosSoon, isWarrantyPast, isWarrantySoon } from '../components/ImportanceBadge';
 
 export const REPLACEMENT_LEAD_TIME = '3 months';
 
@@ -11,10 +11,33 @@ export const REPLACEMENT_CRITERIA = {
 };
 
 export function isOutOfWarranty(item) {
+  if (item.recommended_replacement_date) return false;
   return isWarrantyPast(item.end_of_warranty_date);
 }
 
+export function getHardwareRowClass(item) {
+  if (item.recommended_replacement_date) {
+    if (isDatePast(item.recommended_replacement_date)) return 'eos-past';
+    if (isDateSoon(item.recommended_replacement_date)) return 'eos-soon';
+    return '';
+  }
+  if (isEosPast(item.end_of_support_date)) return 'eos-past';
+  if (isEosSoon(item.end_of_support_date)) return 'eos-soon';
+  if (isWarrantyPast(item.end_of_warranty_date)) return 'eos-past';
+  if (isWarrantySoon(item.end_of_warranty_date)) return 'eos-soon';
+  return '';
+}
+
 export function getReplacementStatus(item) {
+  if (item.recommended_replacement_date) {
+    if (isDatePast(item.recommended_replacement_date)) {
+      return { label: 'Past recommended replacement', sortOrder: 1, rowClass: 'eos-past' };
+    }
+    if (isDateSoon(item.recommended_replacement_date)) {
+      return { label: 'Recommended replacement within 90 days', sortOrder: 2, rowClass: 'eos-soon' };
+    }
+    return { label: `Replace by ${formatDate(item.recommended_replacement_date)}`, sortOrder: 6, rowClass: '' };
+  }
   if (isEosPast(item.end_of_support_date)) {
     return { label: 'Past EOS / EOL', sortOrder: 1, rowClass: 'eos-past' };
   }
@@ -43,6 +66,15 @@ export function isPriorityReplacement(item) {
 }
 
 export function getRecommendationText(item) {
+  if (item.recommended_replacement_date) {
+    if (isDatePast(item.recommended_replacement_date)) {
+      return 'Replace — Manufacturer recommended replacement date has passed';
+    }
+    if (isDateSoon(item.recommended_replacement_date)) {
+      return 'Plan replacement — Manufacturer recommended date approaching';
+    }
+    return `Replace by ${formatDate(item.recommended_replacement_date)} — Manufacturer recommended replacement date`;
+  }
   if (item.upgrade_recommendations?.trim()) {
     return item.upgrade_recommendations.trim();
   }

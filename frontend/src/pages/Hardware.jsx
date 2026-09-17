@@ -5,12 +5,13 @@ import Modal from '../components/Modal';
 import HardwareForm from '../components/HardwareForm';
 import HardwareImport from '../components/HardwareImport';
 import HardwareBulkEdit from '../components/HardwareBulkEdit';
-import ImportanceBadge, { formatDate, formatCost, isEosSoon, isEosPast, isWarrantySoon, isWarrantyPast } from '../components/ImportanceBadge';
+import ImportanceBadge, { formatDate, formatCost } from '../components/ImportanceBadge';
 import Pagination from '../components/Pagination';
 import SortableHeader from '../components/SortableHeader';
 import { getPagination } from '../utils/pagination';
 import { sortHardware, HARDWARE_SORT_COLUMNS, formatHardwareLocation } from '../utils/hardwareSort';
 import { hardwareMatchesSearch } from '../utils/hardwareSearch';
+import { getHardwareRowClass } from '../utils/replacementReview';
 
 const IMPORTANCE_LEVELS = ['', 'low', 'medium', 'high', 'critical'];
 
@@ -151,13 +152,7 @@ export default function Hardware() {
     }
   };
 
-  const rowClass = (item) => {
-    if (isEosPast(item.end_of_support_date)) return 'eos-past';
-    if (isEosSoon(item.end_of_support_date)) return 'eos-soon';
-    if (isWarrantyPast(item.end_of_warranty_date)) return 'eos-past';
-    if (isWarrantySoon(item.end_of_warranty_date)) return 'eos-soon';
-    return '';
-  };
+  const rowClass = (item) => getHardwareRowClass(item);
 
   return (
     <div>
@@ -290,6 +285,7 @@ export default function Hardware() {
                     <td>{item.serial_number || '—'}</td>
                     <td>{formatDate(item.end_of_support_date)}</td>
                     <td>{formatDate(item.end_of_warranty_date)}</td>
+                    <td>{formatDate(item.recommended_replacement_date)}</td>
                     <td>{formatCost(item.estimated_replacement_cost)}</td>
                     <td>
                       {item.username && <div style={{ fontSize: '0.8rem' }}>{item.username}</div>}

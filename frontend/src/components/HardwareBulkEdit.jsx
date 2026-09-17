@@ -11,6 +11,9 @@ export default function HardwareBulkEdit({ selectedCount, rooms, onClose, onComp
   const [applyWarranty, setApplyWarranty] = useState(false);
   const [clearWarranty, setClearWarranty] = useState(false);
   const [endOfWarrantyDate, setEndOfWarrantyDate] = useState('');
+  const [applyRecommendedReplacement, setApplyRecommendedReplacement] = useState(false);
+  const [clearRecommendedReplacement, setClearRecommendedReplacement] = useState(false);
+  const [recommendedReplacementDate, setRecommendedReplacementDate] = useState('');
   const [applyUpgradeNotes, setApplyUpgradeNotes] = useState(false);
   const [upgradeRecommendations, setUpgradeRecommendations] = useState('');
   const [applyCost, setApplyCost] = useState(false);
@@ -38,6 +41,13 @@ export default function HardwareBulkEdit({ selectedCount, rooms, onClose, onComp
       updates.endOfWarrantyDate = clearWarranty ? null : endOfWarrantyDate || null;
       if (!clearWarranty && !endOfWarrantyDate) {
         setError('Select an end of warranty date or choose to clear it');
+        return;
+      }
+    }
+    if (applyRecommendedReplacement) {
+      updates.recommendedReplacementDate = clearRecommendedReplacement ? null : recommendedReplacementDate || null;
+      if (!clearRecommendedReplacement && !recommendedReplacementDate) {
+        setError('Select a recommended replacement date or choose to clear it');
         return;
       }
     }
@@ -118,6 +128,27 @@ export default function HardwareBulkEdit({ selectedCount, rooms, onClose, onComp
           <label className="bulk-edit-row bulk-edit-sub">
             <input type="checkbox" checked={clearWarranty} onChange={(e) => setClearWarranty(e.target.checked)} />
             <span className="bulk-edit-label">Clear warranty date</span>
+          </label>
+        )}
+
+        <label className="bulk-edit-row">
+          <input type="checkbox" checked={applyRecommendedReplacement} onChange={(e) => setApplyRecommendedReplacement(e.target.checked)} />
+          <span className="bulk-edit-label">Recommended Replacement Date</span>
+          <input
+            type="date"
+            value={recommendedReplacementDate}
+            disabled={!applyRecommendedReplacement || clearRecommendedReplacement}
+            onChange={(e) => setRecommendedReplacementDate(e.target.value)}
+          />
+        </label>
+        {applyRecommendedReplacement && (
+          <label className="bulk-edit-row bulk-edit-sub">
+            <input
+              type="checkbox"
+              checked={clearRecommendedReplacement}
+              onChange={(e) => setClearRecommendedReplacement(e.target.checked)}
+            />
+            <span className="bulk-edit-label">Clear recommended replacement date</span>
           </label>
         )}
 

@@ -35,6 +35,7 @@ const SQLITE_SCHEMA = `
     importance_level TEXT NOT NULL CHECK (importance_level IN ('low', 'medium', 'high', 'critical')),
     end_of_support_date TEXT,
     end_of_warranty_date TEXT,
+    recommended_replacement_date TEXT,
     upgrade_recommendations TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -109,6 +110,7 @@ const POSTGRES_SCHEMA = `
     importance_level TEXT NOT NULL CHECK (importance_level IN ('low', 'medium', 'high', 'critical')),
     end_of_support_date TEXT,
     end_of_warranty_date TEXT,
+    recommended_replacement_date TEXT,
     upgrade_recommendations TEXT,
     created_at TEXT NOT NULL DEFAULT TO_CHAR(NOW(), 'YYYY-MM-DD HH24:MI:SS'),
     updated_at TEXT NOT NULL DEFAULT TO_CHAR(NOW(), 'YYYY-MM-DD HH24:MI:SS')
@@ -231,6 +233,9 @@ function createSqliteDriver() {
   if (!hardwareColumns.some((col) => col.name === 'end_of_warranty_date')) {
     db.exec('ALTER TABLE hardware ADD COLUMN end_of_warranty_date TEXT');
   }
+  if (!hardwareColumns.some((col) => col.name === 'recommended_replacement_date')) {
+    db.exec('ALTER TABLE hardware ADD COLUMN recommended_replacement_date TEXT');
+  }
 
   const roomColumns = db.prepare('PRAGMA table_info(conference_rooms)').all();
   if (!roomColumns.some((col) => col.name === 'status')) {
@@ -334,6 +339,7 @@ function createPostgresDriver(pool) {
 async function initPostgresSchema(pgDriver) {
   await pgDriver.exec(POSTGRES_SCHEMA);
   await pgDriver.exec('ALTER TABLE hardware ADD COLUMN IF NOT EXISTS end_of_warranty_date TEXT');
+  await pgDriver.exec('ALTER TABLE hardware ADD COLUMN IF NOT EXISTS recommended_replacement_date TEXT');
   await pgDriver.exec(
     "ALTER TABLE conference_rooms ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'functional'"
   );
