@@ -19,6 +19,21 @@ const {
 const router = express.Router();
 
 const IMPORTANCE_LEVELS = ['low', 'medium', 'high', 'critical'];
+const ISO_DATE_PATTERN = '^\\d{4}-\\d{2}-\\d{2}$';
+
+function eosSoonCondition() {
+  if (db.getDialect() === 'postgres') {
+    return `(h.end_of_support_date IS NOT NULL AND h.end_of_support_date ~ '${ISO_DATE_PATTERN}' AND h.end_of_support_date::date <= CURRENT_DATE + INTERVAL '90 days')`;
+  }
+  return "(h.end_of_support_date IS NOT NULL AND h.end_of_support_date <> '' AND h.end_of_support_date <= date('now', '+90 days'))";
+}
+
+function warrantyExpiredCondition() {
+  if (db.getDialect() === 'postgres') {
+    return `(h.end_of_warranty_date IS NOT NULL AND h.end_of_warranty_date ~ '${ISO_DATE_PATTERN}' AND h.end_of_warranty_date::date < CURRENT_DATE)`;
+  }
+  return "(h.end_of_warranty_date IS NOT NULL AND h.end_of_warranty_date <> '' AND h.end_of_warranty_date < date('now'))";
+}
 
 const insertHardwareStmt = db.prepare(`
   INSERT INTO hardware (
@@ -367,10 +382,10 @@ router.get(
       conditions.push('NOT EXISTS (SELECT 1 FROM hardware_rooms hr WHERE hr.hardware_id = h.id)');
     }
     if (eosSoon === 'true') {
-      conditions.push("h.end_of_support_date IS NOT NULL AND h.end_of_support_date <= date('now', '+90 days')");
+      conditions.push(eosSoonCondition());
     }
     if (warrantyExpired === 'true') {
-      conditions.push("h.end_of_warranty_date IS NOT NULL AND h.end_of_warranty_date < date('now')");
+      conditions.push(warrantyExpiredCondition());
     }
 
     const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
