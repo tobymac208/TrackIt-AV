@@ -7,7 +7,7 @@ import JobSiteForm from '../components/JobSiteForm';
 import RoomStatusBadge from '../components/RoomStatusBadge';
 import Pagination from '../components/Pagination';
 import { getPagination } from '../utils/pagination';
-import { buildJobSiteName, isJobSiteName, parseJobSiteName, stateLabel } from '../utils/jobSite';
+import { buildJobSiteName, isJobSiteName, jobSiteCodeName, parseJobSiteName } from '../utils/jobSite';
 
 export default function JobSites() {
   const { can } = useAuth();
@@ -96,8 +96,7 @@ export default function JobSites() {
                 <tr>
                   <th className="col-num">#</th>
                   <th>Room Name</th>
-                  <th>Site Code</th>
-                  <th>Site</th>
+                  <th>Job Site</th>
                   <th>Status</th>
                   <th>Hardware</th>
                   {canWrite && <th>Actions</th>}
@@ -109,9 +108,8 @@ export default function JobSites() {
                   return (
                     <tr key={room.id} className="clickable" onClick={() => navigate(`/rooms/${room.id}`)}>
                       <td className="col-num">{startIndex + index + 1}</td>
-                      <td>{room.name}</td>
-                      <td>{stateLabel(parsed?.state)}</td>
-                      <td>{parsed?.roomName || '—'}</td>
+                      <td>{parsed?.roomName || room.name}</td>
+                      <td>{jobSiteCodeName(parsed?.state)}</td>
                       <td>
                         <RoomStatusBadge status={room.status} />
                         {room.status === 'issue' && room.issue_description && (

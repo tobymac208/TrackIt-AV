@@ -7,7 +7,6 @@ import RoomForm from '../components/RoomForm';
 import RoomStatusBadge from '../components/RoomStatusBadge';
 import Pagination from '../components/Pagination';
 import { getPagination } from '../utils/pagination';
-import { isJobSiteName, JOB_SITE_OFFICE_NAME } from '../utils/jobSite';
 
 export default function Rooms() {
   const { can } = useAuth();
@@ -21,12 +20,11 @@ export default function Rooms() {
   const [modal, setModal] = useState(null);
   const [page, setPage] = useState(1);
 
-  const officeRooms = rooms.filter((room) => !isJobSiteName(room.name));
-  const { paginatedItems, totalPages, safePage, startIndex } = getPagination(officeRooms, page);
+  const { paginatedItems, totalPages, safePage, startIndex } = getPagination(rooms, page);
 
   useEffect(() => {
     setPage(1);
-  }, [officeFilter, officeRooms.length]);
+  }, [officeFilter, rooms.length]);
 
   const load = () => {
     setLoading(true);
@@ -68,7 +66,7 @@ export default function Rooms() {
       <div className="page-header">
         <div>
           <h2>Conference Rooms</h2>
-          <p>{officeRooms.length} room{officeRooms.length !== 1 ? 's' : ''} listed</p>
+          <p>{rooms.length} room{rooms.length !== 1 ? 's' : ''} listed</p>
         </div>
         {canWrite && (
           <button
@@ -85,9 +83,7 @@ export default function Rooms() {
         <label htmlFor="office-filter">Filter by office:</label>
         <select id="office-filter" value={officeFilter} onChange={(e) => setOfficeFilter(e.target.value)}>
           <option value="">All offices</option>
-          {offices
-            .filter((o) => o.name !== JOB_SITE_OFFICE_NAME)
-            .map((o) => (
+          {offices.map((o) => (
             <option key={o.id} value={o.id}>
               {o.name}
             </option>
@@ -102,7 +98,7 @@ export default function Rooms() {
       {error && <div className="error-banner">{error}</div>}
       {loading ? (
         <div className="loading">Loading rooms...</div>
-      ) : officeRooms.length === 0 ? (
+      ) : rooms.length === 0 ? (
         <div className="empty-state">No conference rooms found.</div>
       ) : (
         <div className="panel">
@@ -151,7 +147,7 @@ export default function Rooms() {
           <Pagination
             page={safePage}
             totalPages={totalPages}
-            totalItems={officeRooms.length}
+            totalItems={rooms.length}
             onPageChange={setPage}
           />
         </div>

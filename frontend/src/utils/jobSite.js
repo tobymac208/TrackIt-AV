@@ -99,8 +99,7 @@ export function isJobSiteName(name) {
   return JOB_SITE_PREFIX_PATTERN.test(String(name || '').trim());
 }
 
-export function stateLabel(code) {
-  const normalized = normalizeSiteCode(code);
-  const state = US_STATES.find((entry) => entry.code === normalizeStateCode(normalized));
-  return state ? `${state.name} (${state.code})` : normalized || '—';
+export function jobSiteCodeName(state) {
+  const code = normalizeSiteCode(state);
+  return code ? `${JOB_SITE_PREFIX}-${code}` : '—';
 }
