@@ -1,10 +1,15 @@
-# AV Hardware Lifecycle Tracker
+# TrackIt! AV
 
-A web application for tracking AV hardware across offices and conference rooms. Built with React (Vite) on the frontend and Node.js + Express on the backend. Local development uses SQLite.
+**TrackIt! AV** is an internal operations app for **audio‑visual (AV) hardware lifecycle management**: what equipment you have, where it lives, when support ends, and what it would cost to replace. It covers **offices, job sites, and conference rooms**, plus shelf stock and bulk CSV import for large inventories.
+
+This project was **built and extended alongside AI coding assistants** (not a vendor product or a tutorial repo). It is **actively used in production at a mid‑sized company** to manage **hundreds of AV devices** across many rooms and locations—day‑to‑day tracking, lifecycle alerts, and upgrade planning for a real AV team.
+
+**Stack:** React (Vite) frontend, Node.js + Express API, SQLite for local dev, Postgres (e.g. Neon) in production. Deployed via Docker on [Railway](https://railway.app).
 
 ## Features
 
 - **Offices** — Create and manage office locations
+- **Job sites** — Track AV at temporary or remote job sites alongside permanent offices
 - **Conference Rooms** — Rooms belong to an office; click a room to view its hardware
 - **Hardware Inventory** — Track manufacturer, model, description, replacement cost, MAC/IP, serial #, software version, credentials, importance level, end-of-support date, and upgrade recommendations
 - **Room Assignment** — Assign hardware to rooms or keep items in unassigned inventory
